@@ -1,7 +1,7 @@
 """Dashboard data-layer tests against synthetic published exports.
 
 No warehouse, network, or Streamlit runtime needed: the fixture writes the
-serving-set Parquet files data.py reads and points WAREHOUSE_DIR at them.
+serving-set Parquet files warehouse.py reads and points WAREHOUSE_DIR at them.
 Two collections share match_number=1 to prove collection isolation.
 """
 
@@ -113,8 +113,8 @@ def warehouse(tmp_path, monkeypatch):
         "notes": None, "timestamp_imported": pd.Timestamp("2026-05-02 09:05"),
     }]).to_parquet(root / "silver/fct_tickets_listings_latest.parquet", index=False)
     monkeypatch.setenv("WAREHOUSE_DIR", str(root))
-    import data
-    return data
+    import warehouse
+    return warehouse
 
 
 def test_event_prices_recompute_and_collection_isolation(warehouse):

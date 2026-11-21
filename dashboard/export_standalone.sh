@@ -9,7 +9,8 @@ DEST="${1:?usage: export_standalone.sh <destination-dir>}"
 # Start from a clean data snapshot so renamed/retired tables never linger.
 rm -rf "$DEST/data_warehouse"
 mkdir -p "$DEST/.streamlit" "$DEST/data_warehouse/semantic" "$DEST/data_warehouse/gold" "$DEST/data_warehouse/silver"
-cp dashboard/streamlit_app.py dashboard/data.py dashboard/requirements.txt "$DEST/"
+cp dashboard/streamlit_app.py dashboard/warehouse.py dashboard/requirements.txt "$DEST/"
+rm -f "$DEST/data.py"  # retired module name from earlier exports
 cp dashboard/.streamlit/secrets.toml.example dashboard/.streamlit/config.toml "$DEST/.streamlit/"
 cp data/data_warehouse/semantic/*.parquet "$DEST/data_warehouse/semantic/"
 cp data/data_warehouse/gold/analytics_tickets_price_changes.parquet "$DEST/data_warehouse/gold/"

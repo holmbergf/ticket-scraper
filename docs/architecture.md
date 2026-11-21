@@ -197,7 +197,7 @@ its first crawl. The Parquet export is the serving contract.
 
 ## 7. Dashboard (`dashboard/`)
 
-Streamlit app reading only published exports via `dashboard/data.py`
+Streamlit app reading only published exports via `dashboard/warehouse.py`
 (DuckDB over Parquet; `WAREHOUSE_DIR` / bundled layout / repo layout).
 Navigation is generated from the published catalogs: shared
 Home/Market/Deals/History analytics (scoped by the sidebar collection

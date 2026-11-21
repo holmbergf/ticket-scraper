@@ -1,6 +1,6 @@
 """Ticket Scraper (Streamlit) — collections, markets, and event pages.
 
-Reads the published semantic Parquet exports via dashboard/data.py.
+Reads the published semantic Parquet exports via dashboard/warehouse.py.
 Navigation is generated from the published collection/event catalog:
 shared analytics pages plus one dedicated page per canonical event.
 
@@ -17,7 +17,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-import data as wh
+import warehouse as wh
 
 try:
     VERSION = wh.warehouse_version()
