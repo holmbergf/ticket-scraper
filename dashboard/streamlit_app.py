@@ -280,18 +280,31 @@ def render_match_card(m, sp_all: pd.DataFrame, changes: pd.DataFrame,
     kickoff = pd.to_datetime(m.event_start_local) if pd.notna(m.event_start_local) else None
     date_text = f"{kickoff:%a, %b %-d · %-I:%M %p}" if kickoff is not None else "Date TBD"
     with st.container(border=True):
-        a, mid, h = st.columns([2, 1, 2])
-        with a:
-            team_block(str(m.team_1 or "TBD"), date_text)
-        with mid:
-            st.markdown('<div class="vs">vs</div>', unsafe_allow_html=True)
-            pill_cls = "pill" if chart_stage(m.stage) in ("Final", "Semi-Final") else "pill pill-amber"
+        known_teams = (
+            pd.notna(m.team_1) and pd.notna(m.team_2)
+            and m.team_1 != "TBD" and m.team_2 != "TBD"
+        )
+        if known_teams:
+            a, mid, h = st.columns([2, 1, 2])
+            with a:
+                team_block(str(m.team_1), date_text)
+            with mid:
+                st.markdown('<div class="vs">vs</div>', unsafe_allow_html=True)
+                pill_cls = "pill" if chart_stage(m.stage) in ("Final", "Semi-Final") else "pill pill-amber"
+                st.markdown(
+                    f'<div style="text-align:center;margin-top:0.45rem">'
+                    f'<span class="{pill_cls}">{m.stage or "Stage TBD"}</span></div>',
+                    unsafe_allow_html=True)
+            with h:
+                team_block(str(m.team_2), f"{m.venue_name or '—'} · {m.city or '—'}", align="right")
+        else:
+            # Knockout fixture listed before its teams were known: name the
+            # card by round + location instead of showing "TBD vs TBD".
             st.markdown(
-                f'<div style="text-align:center;margin-top:0.45rem">'
-                f'<span class="{pill_cls}">{m.stage or "Stage TBD"}</span></div>',
-                unsafe_allow_html=True)
-        with h:
-            team_block(str(m.team_2 or "TBD"), f"{m.venue_name or '—'} · {m.city or '—'}", align="right")
+                f'<div class="team-name">{m.display_name}</div>'
+                f'<div class="team-sub">{date_text} · {m.venue_name or "—"}</div>',
+                unsafe_allow_html=True,
+            )
         st.caption(f"Match {int(m.match_number)} · {m.city or '—'}, {m.country or '—'} · "
                    f"{int(m.sources_tracking) if pd.notna(m.sources_tracking) else 0} sources tracking")
 
@@ -686,23 +699,34 @@ def page_history(ctx: dict) -> None:
                  .properties(height=300).interactive()),
                 width="stretch")
 
-    st.subheader("Individual listings")
-    st.caption("Actual listings from the latest crawl for this game (section medians on the right).")
+    st.subheader(f"Individual listings — {picked}")
+    st.caption(
+        f"Tickets most recently listed for **{picked}** (the game selected at the top "
+        "of this page). This section does not use the multi-game comparison above."
+    )
     candidates = ctx["source_prices"][ctx["source_prices"]["match_number"] == match_no]
     if candidates.empty:
-        st.info("No source prices this game under the current filters.")
+        st.info(f"No source prices for {picked} under the current filters.")
         return
     src = st.segmented_control(
-        "Source", candidates["source"].tolist(), default=candidates.iloc[0]["source"],
+        f"Marketplace for {picked}", candidates["source"].tolist(),
+        default=candidates.iloc[0]["source"],
         format_func=lambda s: SOURCE_DISPLAY_NAMES.get(s, s), key="listing_source_seg")
     if src is None:
-        st.info("Pick a source to see its listings.")
+        st.info(f"Pick a marketplace to see its listings for {picked}.")
         return
     row = candidates[candidates["source"] == src].iloc[0]
     listings = wh.listing_distribution(row["source"], row["event_id_external"])
+    source_name = SOURCE_DISPLAY_NAMES.get(src, src)
     if listings.empty:
-        st.info(f"No individual listings found for this game on {SOURCE_DISPLAY_NAMES.get(src, src)}.")
+        st.info(f"No individual listings found for {picked} on {source_name}.")
         return
+    latest_crawl = pd.to_datetime(listings["crawl_ts_utc"].max())
+    st.markdown(
+        f"**Showing {len(listings):,} listings for {picked} on {source_name}** · "
+        f"latest crawl {latest_crawl:%b %-d, %Y, %-I:%M %p} UTC · "
+        f"cheapest {usd(listings['price'].min())}."
+    )
     col_l, col_r = st.columns([3, 2])
     with col_l:
         st.dataframe(

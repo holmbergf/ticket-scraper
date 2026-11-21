@@ -7,7 +7,7 @@ select
     f.event_id_external,
     f.match_number,
     f.match_key,
-    e.display_name,
+    coalesce(d.display_name, e.display_name) as display_name,
     f.crawl_ts_utc,
     f.crawl_date,
     round(f.lowest_price_cents / 100.0, 2) as lowest_price,
@@ -17,3 +17,5 @@ select
 from {{ ref('fct_tickets_market_snapshots') }} f
 left join {{ ref('clean_tickets_events') }} e
     on e.source = f.source and e.event_id_external = f.event_id_external
+left join {{ ref('dim_tickets_matches') }} d
+    on d.match_number = f.match_number

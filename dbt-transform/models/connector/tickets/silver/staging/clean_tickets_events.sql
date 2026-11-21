@@ -73,6 +73,14 @@ select
     case
         when team_1 is not null and team_2 is not null and team_1 <> 'TBD' and team_2 <> 'TBD'
             then team_1 || ' vs ' || team_2 || coalesce(' (' || stage || ')', '')
+        -- Knockout fixtures are listed before the teams are known. Name
+        -- them by round and host city (e.g. "Quarter-Final — Seattle")
+        -- rather than by an opaque match number. dim_tickets_matches adds
+        -- the date when the same round/city hosts more than one match.
+        when stage in ('Round of 32', 'Round of 16', 'Quarter-Final',
+                       'Semi-Final', 'Bronze Final', 'Final')
+             and city is not null
+            then stage || ' — ' || city
         when match_number is not null
             then 'Match ' || match_number || coalesce(' (' || stage || ')', '')
         when event_name is not null
