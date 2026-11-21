@@ -30,7 +30,7 @@ up immediately.
 
 ## Data path
 
-`dashboard/data.py` reads `data_warehouse/{semantic,gold,silver}` with
+`dashboard/warehouse.py` reads `data_warehouse/{semantic,gold,silver}` with
 DuckDB. Location: `$WAREHOUSE_DIR`, else `$LOCAL_WAREHOUSE_DIR/data_warehouse`,
 else a bundled `data_warehouse/` next to the app (standalone export), else
 the repo's `data/data_warehouse`. Source-subset views are recomputed at
