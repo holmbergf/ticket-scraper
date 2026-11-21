@@ -33,6 +33,10 @@ data/data_warehouse/silver/fct_tickets_market_snapshots.parquet
 data/data_warehouse/silver/fct_tickets_latest_prices.parquet
 data/data_warehouse/silver/dim_tickets_matches.parquet
 
+# macOS/iCloud sync-conflict copies ("part-<hash> 2.parquet") duplicate a
+# partition's rows when the raw zone is read; never commit them.
+data/**/*\ 2.*
+
 # NOTE: data/raw/**, data/_manifests/** and the serving exports above ARE
 # committed — the repository is the storage layer (see docs/architecture.md).
 
