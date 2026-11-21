@@ -3,7 +3,7 @@
 # The exports are small committed Parquet, so the serving set is bundled
 # into the export and the app needs no credentials. Re-run + push the
 # standalone repo to refresh data.
-# Usage: ./dashboard/export_standalone.sh /path/to/ticket-dashboard-checkout
+# Usage: ./dashboard/export_standalone.sh /path/to/ticket-scraper-dashboard-checkout
 set -euo pipefail
 DEST="${1:?usage: export_standalone.sh <destination-dir>}"
 mkdir -p "$DEST/.streamlit" "$DEST/data_warehouse/semantic" "$DEST/data_warehouse/gold" "$DEST/data_warehouse/silver"
