@@ -1,9 +1,8 @@
 # FIFA 2026 Ticket Tracker (Streamlit)
 
 Dashboard over the semantic layer (`semantic_match_prices`,
-`semantic_source_prices`, `semantic_price_trends`), ported from
-fifa_tickets' `dashboard.py`. It reads only the published Parquet exports
-(`data/data_warehouse/`) — never the raw zone, never a database file.
+`semantic_source_prices`, `semantic_price_trends`). It reads only the
+published Parquet exports (`data/data_warehouse/`) — never the raw zone.
 
 Sections: scorecards, market trend, per-source overview, all-games scatter,
 best deals, all-games table with price-change deltas, price by stage/city,

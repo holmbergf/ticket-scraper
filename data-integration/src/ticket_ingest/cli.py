@@ -1,6 +1,6 @@
 """ticket-ingest CLI: ``crawl`` and ``migrate-sqlite`` subcommands.
 
-Warehouse publishing is a separate step, as in elt-pipeline:
+Warehouse publishing is a separate step:
 ``python -m ticket_ingest.publish_warehouse`` after ``dbt build``.
 """
 
@@ -127,8 +127,8 @@ def _build_parser() -> argparse.ArgumentParser:
                        help="Write triggered alerts to JSON (for CI consumption).")
     crawl.add_argument("-v", "--verbose", action="store_true", default=False)
 
-    migrate = sub.add_parser("migrate-sqlite", help="Migrate a legacy fifa_tickets SQLite DB to Parquet.")
-    migrate.add_argument("db_path", help="Path to the legacy SQLite database.")
+    migrate = sub.add_parser("migrate-sqlite", help="Import a SQLite DB (events/market_snapshots/listings tables) into the raw zone.")
+    migrate.add_argument("db_path", help="Path to the SQLite database.")
     migrate.add_argument("-v", "--verbose", action="store_true", default=False)
     return parser
 

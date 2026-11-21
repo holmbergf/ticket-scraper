@@ -1,8 +1,7 @@
 """Price-alert evaluation over the raw Parquet zone (DuckDB).
 
-Ports fifa_tickets' SQLite snapshot-diff + alert rules: compare the current
-crawl against the previous crawl per source/event, then flag large drops,
-inventory collapses, and cross-market gaps. Thresholds unchanged.
+Compares the current crawl against the previous crawl per source/event,
+then flags large drops, inventory collapses, and cross-market gaps.
 """
 
 from __future__ import annotations

@@ -14,7 +14,7 @@ clean-targets:
   - "target"
   - "dbt_packages"
 
-# Full-refresh builds throughout (elt-pipeline convention): at this volume
+# Full-refresh builds throughout: at this volume
 # a full prod build takes seconds. Switch facts to incremental merge on
 # (source, event_id_external, crawl_ts_utc) when a full build nears ~10 min.
 models:

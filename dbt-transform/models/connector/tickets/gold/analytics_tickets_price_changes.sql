@@ -1,7 +1,7 @@
 {{ config(materialized='table') }}
 
--- Per-match price change (port of analytics.get_price_changes): daily best
--- price on the first crawl date vs the latest crawl date.
+-- Per-match price change: daily best price on the first crawl date vs
+-- the latest crawl date.
 with daily_best as (
     select crawl_date, match_key, match_number, min(lowest_price_cents) as best_price_cents
     from {{ ref('fct_tickets_market_snapshots') }}

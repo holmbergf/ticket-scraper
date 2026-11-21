@@ -1,8 +1,8 @@
 {{ config(materialized='table') }}
 
--- Latest snapshot per (source, event) — the "current market" grain the
--- legacy analytics._latest_snapshot_rows computed with MAX(id). Includes
--- events with no snapshot yet (null prices) so coverage gaps stay visible.
+-- Latest snapshot per (source, event) — the "current market" grain.
+-- Includes events with no snapshot yet (null prices) so coverage gaps
+-- stay visible.
 with latest as (
     select *,
         row_number() over (

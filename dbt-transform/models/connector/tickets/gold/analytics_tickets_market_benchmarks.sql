@@ -1,15 +1,9 @@
 {{ config(materialized='table') }}
 
--- Per-crawl-date market benchmarks (port of analytics.get_market_benchmarks):
--- best (= cheapest across sources) price per match per day, then
--- min/median/avg/max over matches. Median is DuckDB's exact MEDIAN; the
--- legacy Python integer median could differ by one cent on even counts.
--- Deliberate correction vs legacy: benchmarks used to MIN over *every*
--- snapshot row including discovery-page teasers (e.g. StubHub grouping
--- pages repeat a featured $1,795 while the event page says $2,529), while
--- legacy latest-price surfaces used the event-page snapshot (MAX id).
--- Here daily best is over canonical per-crawl snapshots only, consistent
--- with every other surface (261 of 3,224 legacy game-days change).
+-- Per-crawl-date market benchmarks: best (= cheapest across sources)
+-- price per match per day, then min/median/avg/max over matches. Daily
+-- best is over canonical per-crawl snapshots only (event-page rows), so
+-- discovery-page featured prices never set the market low.
 with daily_best as (
     select
         crawl_date,

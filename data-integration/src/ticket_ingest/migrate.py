@@ -1,11 +1,11 @@
-"""One-off migration: fifa_tickets SQLite history -> partitioned Parquet.
+"""Import a SQLite database into the partitioned Parquet raw zone.
 
-Reads the legacy ``events`` / ``market_snapshots`` / ``listings`` tables,
-drops SQLite-only columns (autoincrement ``id``, ``raw_snapshot_path``),
-aligns to the frozen raw schemas, and lands everything through the same
-content-addressed ``write_dataset`` path as a live crawl — so the migrated
-history is indistinguishable from crawled data and re-running the migration
-is a no-op. Run via ``ticket-ingest migrate-sqlite <path>``.
+Reads the ``events`` / ``market_snapshots`` / ``listings`` tables, drops
+SQLite-only columns (autoincrement ``id``, ``raw_snapshot_path``), aligns
+to the frozen raw schemas, and lands everything through the same
+content-addressed ``write_dataset`` path as a live crawl — imported rows
+are indistinguishable from crawled data, and re-running the import is a
+no-op. Run via ``ticket-ingest migrate-sqlite <path>``.
 """
 
 from __future__ import annotations
@@ -40,11 +40,10 @@ def migrate_sqlite(db_path: Path, storage: LocalStorage) -> dict[str, int]:
     con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
     try:
         for dataset, natural_key in _TABLES.items():
-            # ORDER BY id: the legacy crawler stored discovery + event-page
-            # snapshots under one crawl_ts and every reader used MAX(id)
-            # ("latest insert wins"). Natural-key dedupe with keep="last"
-            # over id order reproduces exactly those winners (52,279 ->
-            # 35,484 snapshot rows; verified 0 value mismatches).
+            # ORDER BY id: a crawl can store discovery + event-page
+            # snapshots under one crawl_ts, with the event-page row
+            # authoritative ("latest insert wins"). Natural-key dedupe
+            # with keep="last" over id order keeps exactly that row.
             order = " ORDER BY id" if dataset != "events" else ""
             df = pd.read_sql_query(f"SELECT * FROM {dataset}{order}", con)
             df = df.drop(columns=[c for c in df.columns if c in _DROP])

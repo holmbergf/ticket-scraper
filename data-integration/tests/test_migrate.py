@@ -1,4 +1,4 @@
-"""Legacy SQLite -> Parquet migration preserves rows and is idempotent."""
+"""SQLite -> Parquet import preserves rows and is idempotent."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from ticket_ingest.migrate import migrate_sqlite
 from ticket_ingest.storage import LocalStorage
 
 
-def _legacy_db(path: Path) -> None:
+def _sqlite_db(path: Path) -> None:
     con = sqlite3.connect(path)
     con.executescript(
         """
@@ -34,8 +34,8 @@ def _legacy_db(path: Path) -> None:
 
 
 def test_migration_roundtrip(tmp_path: Path):
-    db = tmp_path / "legacy.db"
-    _legacy_db(db)
+    db = tmp_path / "source.db"
+    _sqlite_db(db)
     storage = LocalStorage(tmp_path / "data")
     counts = migrate_sqlite(db, storage)
     assert counts == {"events": 1, "market_snapshots": 1, "listings": 1}

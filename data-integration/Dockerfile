@@ -1,4 +1,4 @@
-# Stateless crawl runner image (parity with elt-pipeline's data-integration).
+# Stateless crawl runner image.
 # Production runs on GitHub Actions; this image is for local/CI reproduction.
 FROM python:3.12-slim
 

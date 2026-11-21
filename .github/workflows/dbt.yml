@@ -32,7 +32,7 @@ jobs:
       # latest successful ingest run and reported below, but the build
       # itself is full: CI DuckDB is ephemeral, and slim selection produces
       # false failures when singular tests reference tables outside the
-      # selection (elt-pipeline lesson). The full fixture build is <2 min.
+      # selection. The full fixture build is <2 min.
       - name: Fetch prod manifest (slim state)
         continue-on-error: true
         env:

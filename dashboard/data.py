@@ -1,17 +1,14 @@
 """Warehouse access for the dashboard.
 
 Reads the published Parquet exports (``data_warehouse/``) with DuckDB —
-never the raw zone and never a database file. This is the Basin-free
-counterpart of elt-pipeline's R2 read path: the exports are committed to
-this repo (serving set) or bundled by ``export_standalone.sh``, so the
-app needs no credentials at all. ``WAREHOUSE_DIR`` (or elt-pipeline's
-``LOCAL_WAREHOUSE_DIR``, pointing at a dir containing ``data_warehouse/``)
-overrides the default repo location.
+never the raw zone. The exports are committed to this repo (serving set)
+or bundled by ``export_standalone.sh``, so the app needs no credentials.
+``WAREHOUSE_DIR`` (or ``LOCAL_WAREHOUSE_DIR``, pointing at a dir containing
+``data_warehouse/``) overrides the default repo location.
 
 Source-subset views (best price across the *selected* sources, filtered
 benchmarks/price changes) are computed at read time from the published
-semantic tables, the same way elt-pipeline's dashboard computes
-"upcoming" at read time rather than trusting a build-day snapshot.
+semantic tables.
 """
 
 from __future__ import annotations
@@ -125,8 +122,7 @@ def match_prices(sources=None, stage=None, city=None, team=None) -> pd.DataFrame
         LEFT JOIN best b USING (match_number)
     """
     df = _con().execute(sql, params).df()
-    # With a source subset, matches no selected source prices drop out (as in
-    # the legacy dashboard, whose summaries only covered crawled sources).
+    # With a source subset, matches no selected source prices drop out.
     if sources:
         df = df[df["sources_with_price"].notna()]
     if stage:

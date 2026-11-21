@@ -1,7 +1,6 @@
 """FIFA World Cup 2026 — Ticket Price Tracker (Streamlit).
 
-Reads the published semantic Parquet exports via dashboard/data.py — no
-database file, no crawler imports. Port of fifa_tickets' dashboard.py.
+Reads the published semantic Parquet exports via dashboard/data.py.
 
 Run with:  streamlit run dashboard/streamlit_app.py
 """
@@ -382,4 +381,4 @@ else:
 st.markdown("---")
 st.caption("Prices shown are the lowest available ticket price per event from each source. "
            "All prices include fees where indicated by the source. "
-           "Data refreshes on the scheduled ingest (crawl → dbt → publish).")
+           "Data refreshes when the pipeline runs (crawl → dbt → publish).")

@@ -1,9 +1,8 @@
-"""Settings from environment. No secrets in code; see .env.example at repo root.
+"""Settings from environment. See .env.example at the repo root.
 
-Basin-free adaptation of elt-pipeline's config: there is no R2/Basin backend.
-The repository working tree *is* the storage layer — data lives under
-``data/`` and is committed by the ingest workflow — so the only settings are
-paths. GitHub Actions and local runs use identical variable names.
+The repository working tree is the storage layer — data lives under
+``data/`` and is committed by the ingest workflow — so the only settings
+are paths. GitHub Actions and local runs use identical variable names.
 """
 
 from __future__ import annotations

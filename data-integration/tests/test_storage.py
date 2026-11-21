@@ -1,7 +1,7 @@
 """Storage contract: content-addressed writes + manifest state.
 
-The load-bearing elt-pipeline properties: identical re-runs write zero new
-files (idempotency), partitions follow the documented layout, and state is
+The load-bearing properties: identical re-runs write zero new files
+(idempotency), partitions follow the documented layout, and state is
 derived from manifests, never a database.
 """
 

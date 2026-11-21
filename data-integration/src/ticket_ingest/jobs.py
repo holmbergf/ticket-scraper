@@ -1,11 +1,10 @@
 """Per-source crawl jobs: fetch -> parse -> land raw Parquet.
 
-Orchestration ported from fifa_tickets' cli.py with one structural change:
-results are accumulated in memory per source and landed once via
-``write_dataset`` (content-addressed Parquet + manifest) instead of being
-written row-by-row into SQLite during the crawl. Fetch/parse behaviour —
-per-source fetch modes, StubHub sequential city sub-pages with WAF backoff,
-Viagogo cross-source expansion, event prioritisation — is unchanged.
+Results are accumulated in memory per source and landed once via
+``write_dataset`` (content-addressed Parquet + manifest). Fetch modes are
+per source; StubHub city sub-pages are fetched sequentially with WAF
+backoff, Viagogo expands cross-source from StubHub event ids, and event
+pages are prioritised (final > USA > knockouts > group stage).
 """
 
 from __future__ import annotations
