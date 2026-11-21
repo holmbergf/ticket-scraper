@@ -1,0 +1,24 @@
+{
+  "run_id": "20261121T172922Z-f616396a0348650b",
+  "dataset": "events",
+  "source": "sqlite-migration:test_full3.db",
+  "written_at": "2026-11-21T17:29:22.643908+00:00",
+  "rows": 481,
+  "keys": [
+    "raw/events/source=fifacollect/part-ee488aa15aeff668.parquet",
+    "raw/events/source=gametime/part-ee1218c940286ee4.parquet",
+    "raw/events/source=stubhub/part-e036a97f7d79ddab.parquet",
+    "raw/events/source=viagogo/part-84cdd94e380e12fc.parquet",
+    "raw/events/source=vivid/part-c4baceff70d61c6d.parquet"
+  ],
+  "skipped_keys": [],
+  "covered_crawl_ts": [],
+  "sources": [
+    "fifacollect",
+    "gametime",
+    "stubhub",
+    "viagogo",
+    "vivid"
+  ],
+  "content_hash": "f616396a0348650b"
+}
