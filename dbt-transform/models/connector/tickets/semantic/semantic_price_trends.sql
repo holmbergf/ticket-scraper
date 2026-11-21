@@ -1,7 +1,7 @@
 {{ config(materialized='view') }}
 
 -- Semantic: full price history per (source, event) in dollars, for trend
--- charts (replaces analytics.get_price_trends).
+-- charts.
 select
     f.source,
     f.event_id_external,

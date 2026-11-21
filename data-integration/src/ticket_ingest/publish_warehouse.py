@@ -1,12 +1,11 @@
 """Publish dbt silver/gold/semantic models to data_warehouse/ Parquet.
 
-Basin-free counterpart of elt-pipeline's publisher: there is no Iceberg
-catalog to overwrite, so the Parquet export *is* the serving contract.
 dbt builds modeled tables inside a DuckDB file; this step exports each
 registered model to ``data/data_warehouse/<layer>/<table>.parquet``
-(zstd), which the dashboard reads and the ingest workflow commits.
-Publishing is a full overwrite — idempotent and immune to partial-failure
-states, at the cost of rewriting a few megabytes. Run after `dbt build`:
+(zstd), which the dashboard reads and the ingest workflow commits. The
+Parquet export is the serving contract. Publishing is a full overwrite —
+idempotent and immune to partial-failure states, at the cost of rewriting
+a few megabytes. Run after `dbt build`:
 
   python -m ticket_ingest.publish_warehouse [path/to/warehouse.duckdb]
 """

@@ -17,7 +17,7 @@ See the repo [README](../README.md) and
 | `storage.py` | Partitioned Parquet writes, manifests, `StateStore`, raw-HTML store |
 | `jobs.py` | Per-source crawl orchestration (fetch → parse → land) |
 | `alerts.py` | Snapshot diffs + price-alert rules over the raw zone |
-| `migrate.py` | One-off legacy SQLite → Parquet history migration |
+| `migrate.py` | SQLite → Parquet raw-zone import |
 | `publish_warehouse.py` | Exports dbt output to `data/data_warehouse/` Parquet |
 | `cli.py` | `ticket-ingest {crawl,migrate-sqlite}` |
 

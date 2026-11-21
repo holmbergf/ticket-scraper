@@ -3,10 +3,9 @@
 ## Project
 
 ELT pipeline tracking FIFA World Cup 2026 resale ticket prices across
-Vivid Seats, Gametime, StubHub, Viagogo, and FIFA Collect. Fork of
-fholmberg/fifa_tickets, restructured on holmbergf/elt-pipeline conventions
-with the git repo as storage (no Cloudflare R2/Basin). Design rationale:
-[docs/architecture.md](docs/architecture.md).
+Vivid Seats, Gametime, StubHub, Viagogo, and FIFA Collect. The git repo
+is the storage layer. Design: [docs/architecture.md](docs/architecture.md).
+Ingestion is manual (no schedule — the tournament has concluded).
 
 ## Build & Run
 

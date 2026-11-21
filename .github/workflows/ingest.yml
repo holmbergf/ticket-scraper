@@ -1,12 +1,8 @@
 name: ingest
 
+# Manual only: the tournament has concluded, so there is no schedule.
+# Run on demand via workflow_dispatch (or locally with ticket-ingest).
 on:
-  schedule:
-    # Same cadence as the legacy fifa_tickets crawl: 3x/day. GitHub cron is
-    # UTC-only (documented, accepted drift — see docs/architecture.md §8).
-    - cron: "0 0 * * *"
-    - cron: "0 8 * * *"
-    - cron: "0 16 * * *"
   workflow_dispatch:
     inputs:
       source:

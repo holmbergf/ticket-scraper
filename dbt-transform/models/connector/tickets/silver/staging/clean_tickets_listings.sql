@@ -1,9 +1,8 @@
 {{ config(materialized='table') }}
 
--- Listings with the bogus structural rows removed: Vivid Seats HTML
--- contains table scaffolding (section "categories", "Section Row Price…",
--- "Section Fees Incl") that the listing regex picks up. This filter lived
--- in analytics.get_listing_distribution(); silver staging owns it now.
+-- Listings with bogus structural rows removed: Vivid Seats HTML contains
+-- table scaffolding (section "categories", "Section Row Price…",
+-- "Section Fees Incl") that the listing regex picks up.
 select
     l.source,
     l.event_id_external,

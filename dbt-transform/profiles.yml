@@ -1,6 +1,6 @@
-# Basin-free: no remote catalog, no S3 secrets. DuckDB reads the committed
-# Parquet raw zone directly off disk (see macros/raw_table.sql). Dev and
-# prod differ only in the DuckDB file they build into.
+# DuckDB reads the committed Parquet raw zone directly off disk
+# (see macros/raw_table.sql). Dev and prod differ only in the DuckDB
+# file they build into.
 dbt_transform:
   target: dev
   outputs:

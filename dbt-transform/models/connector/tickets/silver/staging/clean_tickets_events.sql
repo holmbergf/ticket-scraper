@@ -1,10 +1,9 @@
 {{ config(materialized='table') }}
 
--- Silver staging: all source-specific ugliness is resolved here (this is
--- where fifa_tickets' analytics.py normalisation now lives). Raw events are
--- append-only across crawls, so first collapse to one row per
+-- Silver staging: all source-specific ugliness is resolved here. Raw
+-- events are append-only across crawls, so first collapse to one row per
 -- (source, event): prefer the most complete version, then the latest
--- import (mirrors the old SQLite COALESCE-upsert outcome). Team/city/stage/
+-- import. Team/city/stage/
 -- country canonicalisation goes through seed mappings; unmapped values
 -- pass through visibly rather than being fuzzy-matched.
 with ranked as (

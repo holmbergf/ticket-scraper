@@ -1,16 +1,15 @@
 """Frozen raw schemas — the contract between ingestion and dbt bronze.
 
-Mirrors elt-pipeline's ``iceberg.py`` frozen schemas, minus Iceberg: these
-PyArrow schemas are enforced on every Parquet write, and dbt bronze models
-cast 1:1 against them, so a parser/source schema change fails loudly at the
-bronze cast instead of drifting downstream.
+These PyArrow schemas are enforced on every Parquet write, and dbt bronze
+models cast 1:1 against them, so a parser/source schema change fails
+loudly at the bronze cast rather than drifting downstream.
 
-Conventions carried over from fifa_tickets:
+Conventions:
 - Prices are integer cents. Only dbt semantic models convert to dollars.
 - Timestamps land as ISO-8601 UTC strings; bronze casts them to TIMESTAMP.
-- ``raw_snapshot_path`` (old SQLite column) is dropped: raw HTML snapshots
-  are local debugging artifacts under ``data/raw_html/`` (gitignored), so
-  their paths are meaningless in a committed dataset.
+- No ``raw_snapshot_path`` column: raw HTML snapshots are local debugging
+  artifacts under ``data/raw_html/`` (gitignored), so their paths would be
+  meaningless in a committed dataset.
 """
 
 from __future__ import annotations

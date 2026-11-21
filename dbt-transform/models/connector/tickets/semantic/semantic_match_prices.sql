@@ -1,9 +1,8 @@
 {{ config(materialized='view') }}
 
 -- Semantic: one row per match at current prices, dollars. The dashboard's
--- "all games / best deals" surface (replaces analytics.EventSummary +
--- CrossSourceComparison). best/worst/spread are over per-source lowest
--- prices; savings_vs_worst is null for single-source matches.
+-- "all games / best deals" surface. best/worst/spread are over per-source
+-- lowest prices; savings_vs_worst is null for single-source matches.
 with priced as (
     select * from {{ ref('fct_tickets_latest_prices') }}
     where lowest_price_cents is not null and match_number is not null

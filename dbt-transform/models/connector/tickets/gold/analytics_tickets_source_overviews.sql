@@ -1,6 +1,6 @@
 {{ config(materialized='table') }}
 
--- Per-source current-market overview (port of analytics.get_source_overviews).
+-- Per-source current-market overview.
 select
     source,
     count(*) as total_events,

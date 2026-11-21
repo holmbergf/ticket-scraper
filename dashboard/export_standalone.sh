@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Export the dashboard as a standalone repo (app at root) for Streamlit Cloud.
-# Unlike elt-pipeline (which reads R2 with secrets), the exports are small
-# committed Parquet, so the serving set is bundled into the export and the
-# app needs no credentials. Re-run + push the standalone repo to refresh data.
+# The exports are small committed Parquet, so the serving set is bundled
+# into the export and the app needs no credentials. Re-run + push the
+# standalone repo to refresh data.
 # Usage: ./dashboard/export_standalone.sh /path/to/ticket-dashboard-checkout
 set -euo pipefail
 DEST="${1:?usage: export_standalone.sh <destination-dir>}"

@@ -1,8 +1,8 @@
 """Cleaning helpers shared by crawl and migration jobs.
 
-Deliberately thin, following elt-pipeline: ingestion lands data close to its
-native shape. All real shaping (team/city/stage normalisation, dedupe across
-crawls, joins) happens in dbt silver — never here and never in parsers.
+Deliberately thin: ingestion lands data close to its native shape. All
+real shaping (team/city/stage normalisation, dedupe across crawls, joins)
+happens in dbt silver — never here and never in parsers.
 """
 
 from __future__ import annotations

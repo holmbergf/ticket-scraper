@@ -8,15 +8,12 @@ Layout under ``data/`` (the git repository is the storage layer):
   _manifests/<dataset>/<run_id>.json
   data_warehouse/{silver,gold,semantic}/<table>.parquet   (publish step)
 
-This is elt-pipeline's R2 layout with the bucket/sport levels removed (one
-connector) and the filesystem as the only backend. Keys are
-content-addressed, so re-running a crawl is a no-op instead of appending
-duplicates. Manifests are the watermark/state store: they record covered
-crawl timestamps and row counts per run. There is no state database to
-back up or disagree with the data — and, unlike the old design, a crawl
-commit only ever *adds* its own small partition files (~125 KB) instead of
-rewriting a 100 MB SQLite blob, which is what keeps the repo inside
-GitHub's per-file and repository-size limits.
+Keys are content-addressed, so re-running a crawl is a no-op rather than
+appending duplicates. Manifests are the watermark/state store: they
+record covered crawl timestamps and row counts per run. There is no state
+database to back up or disagree with the data. A crawl commit only ever
+adds its own small partition files (~125 KB); no existing file is
+rewritten or grows.
 """
 
 from __future__ import annotations
