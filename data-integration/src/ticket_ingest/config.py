@@ -15,9 +15,24 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# data-integration/src/ticket_ingest/config.py -> repo root is 3 parents up
-# from the package dir: ticket_ingest/ -> src/ -> data-integration/ -> root.
-REPO_ROOT = Path(__file__).resolve().parents[3]
+
+def _discover_repo_root() -> Path:
+    """Find the checkout root from cwd or this file's location.
+
+    An editable install resolves inside the checkout, but a regular
+    install lands in site-packages — there the working directory (CI and
+    local runs start at the repo root) is the only reliable anchor.
+    """
+    here = Path(__file__).resolve()
+    for start in (Path.cwd(), here):
+        for parent in (start, *start.parents):
+            if (parent / "collections").is_dir() and (parent / "dbt-transform").is_dir():
+                return parent
+    # Editable layout fallback: ticket_ingest/ -> src/ -> data-integration/ -> root.
+    return here.parents[3]
+
+
+REPO_ROOT = _discover_repo_root()
 
 
 @dataclass(frozen=True)

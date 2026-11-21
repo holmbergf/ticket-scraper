@@ -122,7 +122,14 @@ def build_catalog_frames(
             })
             event_rows[key] = row
 
-    events = pd.DataFrame(list(event_rows.values()))
+    events = pd.DataFrame(
+        list(event_rows.values()),
+        columns=["collection_slug", "event_key", "event_uid", "display_name",
+                 "event_name", "stage", "sequence", "match_number",
+                 "participant_1", "participant_2", "team_1", "team_2",
+                 "event_start_local", "venue_name", "city", "region",
+                 "country", "sources_tracking", "has_warehouse_data"],
+    )
     if not events.empty:
         # Keep starts as ISO strings uniformly: config rows carry strings
         # (some with UTC offsets) while warehouse rows carry timestamps;
