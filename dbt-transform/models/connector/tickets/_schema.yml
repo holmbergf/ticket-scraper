@@ -1,0 +1,34 @@
+version: 2
+
+models:
+  - name: clean_tickets_events
+    description: "One normalized row per (source, event); teams/city/stage/country canonicalized."
+    columns:
+      - name: source
+        tests: [not_null]
+      - name: event_id_external
+        tests: [not_null]
+
+  - name: dim_tickets_matches
+    description: "Conformed match dimension, one row per match_number."
+    columns:
+      - name: match_number
+        tests: [not_null, unique]
+      - name: match_key
+        tests: [not_null, unique]
+
+  - name: fct_tickets_latest_prices
+    description: "Latest snapshot per (source, event), integer cents."
+    columns:
+      - name: source
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['fifacollect', 'gametime', 'stubhub', 'viagogo', 'vivid']
+
+  - name: semantic_match_prices
+    description: "One row per match at current prices (dollars). Dashboard surface."
+    columns:
+      - name: match_number
+        tests: [not_null, unique]

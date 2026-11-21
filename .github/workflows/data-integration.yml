@@ -1,0 +1,35 @@
+name: ci/data-integration
+
+on:
+  push:
+    branches: [main]
+    paths: ["data-integration/**", ".github/workflows/data-integration.yml"]
+  pull_request:
+    paths: ["data-integration/**", ".github/workflows/data-integration.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-data-integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install
+        run: pip install "./data-integration[dev]"
+      - name: Unit tests (committed HTML fixtures, no network/secrets needed)
+        run: python -m pytest data-integration/tests -q
+      - name: Byte-compile + CLI smoke
+        run: |
+          python -m compileall -q data-integration/src
+          ticket-ingest --help

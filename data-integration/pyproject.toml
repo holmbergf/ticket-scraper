@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ticket-ingest"
+version = "0.1.0"
+description = "FIFA World Cup 2026 ticket-price ingestion: marketplace crawlers landing content-addressed Parquet in the repo"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pandas>=2.0",
+    "pyarrow>=14",
+    "duckdb>=1.0",
+    "urllib3>=2.0",
+    "playwright>=1.40",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+ticket-ingest = "ticket_ingest.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ticket_ingest"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
