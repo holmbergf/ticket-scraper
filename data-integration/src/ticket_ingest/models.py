@@ -20,6 +20,8 @@ class Event:
     region: str | None = None
     country: str | None = None
     currency: str | None = None
+    collection_slug: str = "fifa-world-cup-2026"
+    event_key: str | None = None
 
 
 @dataclass(slots=True)
@@ -36,6 +38,8 @@ class MarketSnapshot:
     listing_quality_label: str | None = None
     price_refresh_ts_utc: str | None = None
     raw_snapshot_path: str | None = None
+    collection_slug: str = "fifa-world-cup-2026"
+    event_key: str | None = None
 
 
 @dataclass(slots=True)
@@ -88,6 +92,8 @@ class Listing:
     deal_score: float | None = None
     deal_label: str | None = None
     notes: str | None = None
+    collection_slug: str = "fifa-world-cup-2026"
+    event_key: str | None = None
 
 
 @dataclass(slots=True)

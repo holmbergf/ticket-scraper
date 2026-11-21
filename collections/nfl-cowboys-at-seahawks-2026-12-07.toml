@@ -1,0 +1,72 @@
+# A single-game collection: one canonical event, tracked on every
+# marketplace that lists it. Direct event URLs are declared per source,
+# so standing this up needs no schedule-wide discovery crawl.
+slug = "nfl-cowboys-at-seahawks-2026-12-07"
+title = "Cowboys at Seahawks — Dec 7, 2026"
+kind = "game"
+status = "active"
+description = "Dallas Cowboys at Seattle Seahawks, Monday Night Football at Lumen Field."
+timezone = "America/Los_Angeles"
+icon = "🏈"
+accent_color = "#4a7fc9"
+
+[[events]]
+key = "dallas-cowboys-at-seattle-seahawks"
+name = "Dallas Cowboys at Seattle Seahawks"
+stage = "Monday Night Football"
+sequence = 1
+participant_1 = "Dallas Cowboys"
+participant_2 = "Seattle Seahawks"
+starts_at_local = "2026-12-07T17:15:00-08:00"
+venue_name = "Lumen Field"
+city = "Seattle"
+region = "WA"
+country = "United States"
+currency = "USD"
+match_terms = ["Dallas Cowboys", "Seattle Seahawks"]
+source_event_ids = { gametime = "695daa7b5a70588e305211c4", vivid = "6492969", stubhub = "160436508", viagogo = "160436508" }
+
+[sources.gametime]
+mode = "event_urls"
+page_key = "cowboys-seahawks"
+# Listings render client-side; scroll so the listing cards load.
+fetch_mode = "playwright"
+event_scroll = true
+event_wait_selector = "[data-testid^='listing-card-']"
+expected_events = 1
+
+[[sources.gametime.event_urls]]
+event_key = "dallas-cowboys-at-seattle-seahawks"
+url = "https://gametime.co/nfl-football/dallas-cowboys-at-seattle-seahawks-monday-night-football-tickets/12-7-2026-seattle-wa-lumen-field/events/695daa7b5a70588e305211c4"
+
+[sources.vivid]
+mode = "event_urls"
+page_key = "cowboys-seahawks"
+fetch_mode = "browser"
+expected_events = 1
+
+[[sources.vivid.event_urls]]
+event_key = "dallas-cowboys-at-seattle-seahawks"
+url = "https://www.vividseats.com/seattle-seahawks-tickets-seattle-lumen-field-3-4-2027/production/6492969"
+
+[sources.stubhub]
+mode = "event_urls"
+page_key = "cowboys-seahawks"
+fetch_mode = "playwright"
+max_workers = 1
+expected_events = 1
+
+[[sources.stubhub.event_urls]]
+event_key = "dallas-cowboys-at-seattle-seahawks"
+url = "https://www.stubhub.com/seattle-seahawks-seattle-tickets-12-7-2026/event/160436508/"
+
+[sources.viagogo]
+mode = "event_urls"
+page_key = "cowboys-seahawks"
+fetch_mode = "playwright"
+max_workers = 1
+expected_events = 1
+
+[[sources.viagogo.event_urls]]
+event_key = "dallas-cowboys-at-seattle-seahawks"
+url = "https://www.viagogo.com/Sports-Tickets/Football/American-Football-Road-Games/Seattle-Seahawks-Tickets/E-160436508"

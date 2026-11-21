@@ -1,23 +1,24 @@
-# FIFA 2026 Ticket Tracker (Streamlit)
+# Ticket Scraper (Streamlit)
 
-Dashboard over the semantic layer (`semantic_match_prices`,
-`semantic_source_prices`, `semantic_price_trends`). It reads only the
+Dashboard over the semantic layer (`semantic_collections`,
+`semantic_event_catalog`, `semantic_event_prices`, `semantic_source_prices`,
+`semantic_price_trends`). It reads only the
 published Parquet exports (`data/data_warehouse/`) — never the raw zone.
 
-Four pages (sidebar radio), with global source/stage/city/team filters:
+Navigation is generated from the published catalogs:
 
-- **Matches** — a match "card" (team-vs-team header, metric tiles,
-  inventory share bar, per-source price bars, benchmark compare bars, and a
-  price-context expander) over a clickable all-games table with daily-best
-  sparklines. Tick a row's checkbox to load that match; sort by kickoff,
-  cheapest, or biggest drop.
-- **Market** — scorecards, market price trend (median/average/cheapest,
-  zoomable), price by source, stage, and city (+ map in an expander).
-- **Deals** — cross-source savings, biggest first-to-latest drops, and the
-  current price distribution, as switchable views.
-- **History** — per-game price lines by source against the tournament
-  median, days-to-kickoff comparison curves, and a listing drill-down
-  with section medians.
+- **Home** — every collection with coverage, cheapest event, and links.
+- **Market / Deals / History** — shared analytics scoped to the sidebar's
+  analytics collection (trends, cross-source savings/drops, per-event
+  history, days-to-event curves, listing drill-down).
+- **One overview per collection** — an event card plus a clickable
+  all-events table with daily-best sparklines.
+- **One dedicated page per canonical event** — event card, price history,
+  and listings for exactly that event (e.g.
+  `event-nfl-cowboys-at-seahawks-2026-12-07--dallas-cowboys-at-seattle-seahawks`).
+
+New collections and events appear automatically after the next publish;
+no dashboard code changes are needed.
 
 Design language: dark theme (`.streamlit/config.toml`), narrow 1180px
 content column, custom metric-card CSS, per-source colors used

@@ -31,7 +31,7 @@ data/raw_html/
 data/data_warehouse/silver/clean_*.parquet
 data/data_warehouse/silver/fct_tickets_market_snapshots.parquet
 data/data_warehouse/silver/fct_tickets_latest_prices.parquet
-data/data_warehouse/silver/dim_tickets_matches.parquet
+data/data_warehouse/silver/dim_tickets_events.parquet
 
 # macOS/iCloud sync-conflict copies ("part-<hash> 2.parquet") duplicate a
 # partition's rows when the raw zone is read; never commit them.

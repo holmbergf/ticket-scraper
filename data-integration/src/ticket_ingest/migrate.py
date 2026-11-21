@@ -31,7 +31,8 @@ _TABLES = {
 _DROP = {"id", "raw_snapshot_path"}
 
 
-def migrate_sqlite(db_path: Path, storage: LocalStorage) -> dict[str, int]:
+def migrate_sqlite(db_path: Path, storage: LocalStorage,
+                   collection_slug: str = "fifa-world-cup-2026") -> dict[str, int]:
     db_path = Path(db_path)
     if not db_path.exists():
         raise FileNotFoundError(db_path)
@@ -39,6 +40,18 @@ def migrate_sqlite(db_path: Path, storage: LocalStorage) -> dict[str, int]:
     counts: dict[str, int] = {}
     con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
     try:
+        # Map source events to canonical keys from the events table so
+        # snapshots/listings land already stamped with identity.
+        key_map: dict[tuple[str, str], str] = {}
+        try:
+            ev = pd.read_sql_query(
+                "SELECT source, event_id_external, match_number FROM events", con)
+            for _, r in ev.iterrows():
+                key_map[(str(r["source"]), str(r["event_id_external"]))] = (
+                    f"match-{int(r['match_number'])}" if pd.notna(r["match_number"])
+                    else f"{r['source']}-{r['event_id_external']}")
+        except Exception:
+            pass
         for dataset, natural_key in _TABLES.items():
             # ORDER BY id: a crawl can store discovery + event-page
             # snapshots under one crawl_ts, with the event-page row
@@ -48,6 +61,13 @@ def migrate_sqlite(db_path: Path, storage: LocalStorage) -> dict[str, int]:
             df = pd.read_sql_query(f"SELECT * FROM {dataset}{order}", con)
             df = df.drop(columns=[c for c in df.columns if c in _DROP])
             df["timestamp_imported"] = imported
+            if "collection_slug" not in df.columns:
+                df["collection_slug"] = collection_slug
+            if "event_key" not in df.columns:
+                df["event_key"] = [
+                    key_map.get((str(s), str(e)))
+                    for s, e in zip(df.get("source", []), df.get("event_id_external", []))
+                ]
             if dataset == "market_snapshots" and "lowest_price_includes_fees" in df.columns:
                 df["lowest_price_includes_fees"] = df["lowest_price_includes_fees"].map(
                     lambda v: None if pd.isna(v) else bool(v))

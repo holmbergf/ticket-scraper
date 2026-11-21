@@ -3,9 +3,9 @@ name: ci/data-integration
 on:
   push:
     branches: [main]
-    paths: ["data-integration/**", ".github/workflows/data-integration.yml"]
+    paths: ["data-integration/**", "collections/**", ".github/workflows/data-integration.yml", ".github/workflows/ingest-collection.yml", ".github/workflows/ingest-*.yml"]
   pull_request:
-    paths: ["data-integration/**", ".github/workflows/data-integration.yml"]
+    paths: ["data-integration/**", "collections/**", ".github/workflows/data-integration.yml", ".github/workflows/ingest-collection.yml", ".github/workflows/ingest-*.yml"]
   workflow_dispatch:
 
 permissions:

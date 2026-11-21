@@ -4,9 +4,15 @@
 -- filtering: a raw schema break must fail in exactly one obvious place.
 with source as (
     select * from {{ raw_table('events') }}
+    union all by name
+    -- Files written before collections existed lack these columns;
+    -- this empty branch gives every generation one stable schema.
+    select null::varchar as collection_slug, null::varchar as event_key where false
 )
 
 select
+    collection_slug,
+    event_key,
     source,
     event_id_external,
     event_url,

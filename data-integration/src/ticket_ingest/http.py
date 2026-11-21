@@ -252,6 +252,7 @@ def fetch_text_playwright(
     wait_until: str = "domcontentloaded",
     scroll: bool = False,
     min_interval: float | None = None,
+    wait_selector: str | None = None,
 ) -> FetchResponse:
     from urllib.parse import urlparse
     domain = urlparse(url).netloc
@@ -286,6 +287,12 @@ def fetch_text_playwright(
             page.wait_for_timeout(3000 + i * 1000)
         else:
             page.wait_for_timeout(1000)
+
+        if wait_selector:
+            try:
+                page.wait_for_selector(wait_selector, timeout=min(timeout_ms, 20_000))
+            except Exception:
+                log.warning("Timed out waiting for selector %s on %s", wait_selector, url)
 
         if scroll:
             prev_height = 0

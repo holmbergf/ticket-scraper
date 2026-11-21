@@ -6,9 +6,11 @@ or bundled by ``export_standalone.sh``, so the app needs no credentials.
 ``WAREHOUSE_DIR`` (or ``LOCAL_WAREHOUSE_DIR``, pointing at a dir containing
 ``data_warehouse/``) overrides the default repo location.
 
-Source-subset views (best price across the *selected* sources, filtered
-benchmarks/price changes) are computed at read time from the published
-semantic tables.
+Everything is collection-scoped: canonical events carry
+``collection_slug`` + ``event_key`` (+ global ``event_uid``), and every
+query filters by collection so collections never blend into one another's
+benchmarks. Source-subset views are recomputed at read time from the
+published semantic tables.
 """
 
 from __future__ import annotations
@@ -20,7 +22,9 @@ import duckdb
 import pandas as pd
 
 TABLES = {
-    "match_prices": "semantic/semantic_match_prices.parquet",
+    "collections": "semantic/semantic_collections.parquet",
+    "event_catalog": "semantic/semantic_event_catalog.parquet",
+    "event_prices": "semantic/semantic_event_prices.parquet",
     "source_prices": "semantic/semantic_source_prices.parquet",
     "price_trends": "semantic/semantic_price_trends.parquet",
     "market_trends": "semantic/semantic_market_trends.parquet",
@@ -79,57 +83,116 @@ def load(table: str) -> pd.DataFrame:
     return _con().execute(f"SELECT * FROM read_parquet('{_path(table)}')").df()
 
 
-def _source_filter(sources: list[str] | tuple[str, ...] | None, col: str = "source") -> tuple[str, list]:
-    if not sources:
+def _filter(values, col: str) -> tuple[str, list]:
+    if values is None:
         return "", []
-    placeholders = ", ".join("?" for _ in sources)
-    return f"{col} IN ({placeholders})", list(sources)
+    vals = [values] if isinstance(values, str) else list(values)
+    if not vals:
+        return "", []
+    return f"{col} IN ({', '.join('?' for _ in vals)})", vals
 
 
-def sources() -> list[str]:
-    return sorted(load("source_overview")["source"].tolist())
+def collections() -> pd.DataFrame:
+    """Published collection registry (drives dashboard page generation)."""
+    try:
+        return load("collections")
+    except FileNotFoundError:
+        # Older publish without catalog tables: derive from event prices.
+        ep = load("event_prices")
+        rows = []
+        for slug, g in ep.groupby("collection_slug"):
+            rows.append({
+                "collection_slug": slug, "title": slug, "kind": "event",
+                "status": "active", "description": "", "timezone": "UTC",
+                "icon": "🎟️", "accent_color": "#3aa76d",
+                "configured_events": 0, "warehouse_events": len(g),
+                "event_count": len(g),
+                "priced_events": int(g["best_price"].notna().sum()),
+                "cheapest_price": g["best_price"].min(),
+            })
+        return pd.DataFrame(rows)
 
 
-def cities() -> list[str]:
-    return sorted(c for c in load("match_prices")["city"].dropna().unique().tolist() if c)
+def event_catalog(collection: str | None = None) -> pd.DataFrame:
+    df = load("event_catalog")
+    return df[df["collection_slug"] == collection].reset_index(drop=True) if collection else df
 
 
-def teams() -> list[str]:
-    df = load("match_prices")
-    return sorted(t for t in pd.concat([df["team_1"], df["team_2"]]).dropna().unique().tolist()
-                  if t and t != "TBD")
+def sources(collection: str | None = None) -> list[str]:
+    df = load("source_overview")
+    if collection and "collection_slug" in df.columns:
+        df = df[df["collection_slug"] == collection]
+    return sorted(df["source"].dropna().unique().tolist())
 
 
-def crawl_timestamps() -> list[str]:
+def cities(collection: str | None = None) -> list[str]:
+    df = load("event_prices")
+    if collection:
+        df = df[df["collection_slug"] == collection]
+    return sorted(c for c in df["city"].dropna().unique().tolist() if c)
+
+
+def participants(collection: str | None = None) -> list[str]:
+    df = load("event_prices")
+    if collection:
+        df = df[df["collection_slug"] == collection]
+    cols = [c for c in ("participant_1", "participant_2", "team_1", "team_2") if c in df.columns]
+    vals = pd.concat([df[c] for c in cols]) if cols else pd.Series(dtype=object)
+    return sorted(t for t in vals.dropna().unique().tolist() if t and t != "TBD")
+
+
+def teams(collection: str | None = None) -> list[str]:
+    return participants(collection)
+
+
+def stages(collection: str | None = None) -> list[str]:
+    df = load("event_prices")
+    if collection:
+        df = df[df["collection_slug"] == collection]
+    return sorted(s for s in df["stage"].dropna().unique().tolist() if s)
+
+
+def crawl_timestamps(collection: str | None = None) -> list[str]:
+    cf, params = _filter(collection, "collection_slug")
+    where = f"WHERE {cf}" if cf else ""
     df = _con().execute(
-        f"SELECT DISTINCT crawl_ts_utc FROM read_parquet('{_path('price_trends')}') ORDER BY 1").df()
+        f"SELECT DISTINCT crawl_ts_utc FROM read_parquet('{_path('price_trends')}') {where} ORDER BY 1",
+        params).df()
     return df["crawl_ts_utc"].astype(str).tolist()
 
 
-def match_prices(sources=None, stage=None, city=None, team=None) -> pd.DataFrame:
-    """One row per match; best/worst recomputed over the selected sources."""
-    sf, params = _source_filter(sources, "sp.source")
-    where = f"WHERE sp.lowest_price IS NOT NULL AND sp.match_number IS NOT NULL"
+def event_prices(collection: str | None = None, sources=None,
+                 stage=None, city=None, participant=None) -> pd.DataFrame:
+    """One row per canonical event; best/worst over the selected sources."""
+    sf, sparams = _filter(sources, "sp.source")
+    cf, cparams = _filter(collection, "sp.collection_slug")
+    clauses = ["sp.lowest_price IS NOT NULL", "sp.event_key IS NOT NULL"]
     if sf:
-        where += f" AND {sf}"
+        clauses.append(sf)
+    if cf:
+        clauses.append(cf)
+    where = "WHERE " + " AND ".join(clauses)
     sql = f"""
         WITH dim AS (
-            SELECT match_number, match_key, display_name, stage, team_1, team_2,
-                   event_start_local, match_date, venue_name, city, country, sources_tracking
-            FROM read_parquet('{_path('match_prices')}')
+            SELECT collection_slug, event_key, event_uid, match_number, match_key,
+                   display_name, stage, team_1, team_2, participant_1, participant_2,
+                   event_start_local, event_date, match_date, venue_name, city,
+                   country, sources_tracking
+            FROM read_parquet('{_path('event_prices')}')
         ),
         priced AS (
             SELECT * FROM read_parquet('{_path('source_prices')}') sp {where}
         ),
         agg AS (
-            SELECT match_number, MIN(lowest_price) AS best_price, MAX(lowest_price) AS worst_price,
-                   COUNT(*) AS sources_with_price, SUM(inventory_count) AS total_inventory,
-                   MAX(crawl_ts_utc) AS latest_crawl_ts_utc
-            FROM priced GROUP BY 1
+            SELECT collection_slug, event_uid, MIN(lowest_price) AS best_price,
+                   MAX(lowest_price) AS worst_price, COUNT(*) AS sources_with_price,
+                   SUM(inventory_count) AS total_inventory, MAX(crawl_ts_utc) AS latest_crawl_ts_utc
+            FROM priced GROUP BY 1, 2
         ),
         best AS (
-            SELECT match_number, source AS best_source FROM (
-                SELECT *, ROW_NUMBER() OVER (PARTITION BY match_number ORDER BY lowest_price, source) AS rn
+            SELECT collection_slug, event_uid, source AS best_source FROM (
+                SELECT *, ROW_NUMBER() OVER (PARTITION BY collection_slug, event_uid
+                                             ORDER BY lowest_price, source) AS rn
                 FROM priced
             ) WHERE rn = 1
         )
@@ -137,30 +200,34 @@ def match_prices(sources=None, stage=None, city=None, team=None) -> pd.DataFrame
                CASE WHEN a.sources_with_price >= 2 THEN a.worst_price - a.best_price END AS savings_vs_worst,
                a.sources_with_price, a.total_inventory, a.latest_crawl_ts_utc
         FROM dim d
-        LEFT JOIN agg a USING (match_number)
-        LEFT JOIN best b USING (match_number)
+        LEFT JOIN agg a USING (collection_slug, event_uid)
+        LEFT JOIN best b USING (collection_slug, event_uid)
     """
-    df = _con().execute(sql, params).df()
-    # With a source subset, matches no selected source prices drop out.
+    df = _con().execute(sql, sparams + cparams).df()
+    if collection:
+        df = df[df["collection_slug"] == collection]
     if sources:
         df = df[df["sources_with_price"].notna()]
     if stage:
         df = df[df["stage"] == stage]
     if city:
         df = df[df["city"] == city]
-    if team:
-        df = df[(df["team_1"] == team) | (df["team_2"] == team)]
-    return df.sort_values(["event_start_local", "match_number"]).reset_index(drop=True)
+    if participant:
+        df = df[(df["team_1"] == participant) | (df["team_2"] == participant)
+                | (df["participant_1"] == participant) | (df["participant_2"] == participant)]
+    return df.sort_values(["event_start_local", "event_uid"]).reset_index(drop=True)
 
 
-def source_prices(sources=None) -> pd.DataFrame:
+def source_prices(collection: str | None = None, sources=None) -> pd.DataFrame:
     df = load("source_prices")
+    if collection:
+        df = df[df["collection_slug"] == collection]
     return df[df["source"].isin(sources)] if sources else df
 
 
-def source_overview(sources=None) -> pd.DataFrame:
+def source_overview(collection: str | None = None, sources=None) -> pd.DataFrame:
     """Per-source overview recomputed on the selected sources' latest prices."""
-    priced = source_prices(sources)
+    priced = source_prices(collection, sources)
     rows = []
     for source, g in priced.groupby("source"):
         p = g["lowest_price"].dropna()
@@ -171,76 +238,96 @@ def source_overview(sources=None) -> pd.DataFrame:
             "total_inventory": g["inventory_count"].sum(min_count=1),
             "last_crawl_ts_utc": g["crawl_ts_utc"].max(),
         })
+    if not rows:
+        return pd.DataFrame(rows)
     return pd.DataFrame(rows).sort_values("source").reset_index(drop=True)
 
 
-def market_trends(sources=None) -> pd.DataFrame:
-    """Daily benchmarks over the selected sources (daily best per match)."""
-    sf, params = _source_filter(sources)
-    where = "WHERE lowest_price IS NOT NULL AND match_number IS NOT NULL"
+def market_trends(collection: str | None = None, sources=None) -> pd.DataFrame:
+    """Daily benchmarks for one collection (daily best per canonical event)."""
+    sf, sparams = _filter(sources, "source")
+    cf, cparams = _filter(collection, "collection_slug")
+    clauses = ["lowest_price IS NOT NULL", "event_uid IS NOT NULL"]
     if sf:
-        where += f" AND {sf}"
+        clauses.append(sf)
+    if cf:
+        clauses.append(cf)
+    where = "WHERE " + " AND ".join(clauses)
     return _con().execute(f"""
         WITH daily_best AS (
-            SELECT crawl_date, match_number, MIN(lowest_price) AS best_price,
+            SELECT collection_slug, crawl_date, event_uid, MIN(lowest_price) AS best_price,
                    SUM(inventory_count) AS total_inventory
             FROM read_parquet('{_path('price_trends')}') {where}
-            GROUP BY 1, 2
+            GROUP BY 1, 2, 3
         )
         SELECT crawl_date, MIN(best_price) AS min_price, MEDIAN(best_price) AS median_price,
                ROUND(AVG(best_price), 2) AS avg_price, MAX(best_price) AS max_price,
                COUNT(*) AS total_events, SUM(total_inventory) AS total_inventory
         FROM daily_best GROUP BY 1 ORDER BY 1
-    """, params).df()
+    """, sparams + cparams).df()
 
 
-def price_changes(sources=None) -> pd.DataFrame:
-    """First vs latest daily-best price per match, over the selected sources."""
-    sf, params = _source_filter(sources)
-    where = "WHERE lowest_price IS NOT NULL AND match_number IS NOT NULL"
+def price_changes(collection: str | None = None, sources=None) -> pd.DataFrame:
+    """First vs latest daily-best price per canonical event."""
+    sf, sparams = _filter(sources, "source")
+    cf, cparams = _filter(collection, "collection_slug")
+    clauses = ["lowest_price IS NOT NULL", "event_uid IS NOT NULL"]
     if sf:
-        where += f" AND {sf}"
+        clauses.append(sf)
+    if cf:
+        clauses.append(cf)
+    where = "WHERE " + " AND ".join(clauses)
     return _con().execute(f"""
         WITH daily_best AS (
-            SELECT crawl_date, match_number, match_key, MIN(lowest_price) AS best_price
+            SELECT collection_slug, crawl_date, event_uid, event_key, match_key,
+                   match_number, MIN(lowest_price) AS best_price
             FROM read_parquet('{_path('price_trends')}') {where}
-            GROUP BY 1, 2, 3
+            GROUP BY 1, 2, 3, 4, 5, 6
         ),
-        bounds AS (SELECT match_number, MIN(crawl_date) AS fd, MAX(crawl_date) AS ld FROM daily_best GROUP BY 1)
-        SELECT f.match_key, b.match_number, f.best_price AS first_price, l.best_price AS latest_price,
+        bounds AS (SELECT collection_slug, event_uid, MIN(crawl_date) AS fd, MAX(crawl_date) AS ld
+                   FROM daily_best GROUP BY 1, 2)
+        SELECT f.collection_slug, f.event_key, f.match_key, b.event_uid, f.match_number,
+               f.best_price AS first_price, l.best_price AS latest_price,
                ROUND(l.best_price - f.best_price, 2) AS change_dollars,
                CASE WHEN f.best_price > 0 THEN ROUND((l.best_price - f.best_price) * 100.0 / f.best_price, 1) ELSE 0 END AS change_pct
         FROM bounds b
-        JOIN daily_best f ON f.match_number = b.match_number AND f.crawl_date = b.fd
-        JOIN daily_best l ON l.match_number = b.match_number AND l.crawl_date = b.ld
-    """, params).df()
+        JOIN daily_best f ON f.collection_slug = b.collection_slug AND f.event_uid = b.event_uid AND f.crawl_date = b.fd
+        JOIN daily_best l ON l.collection_slug = b.collection_slug AND l.event_uid = b.event_uid AND l.crawl_date = b.ld
+    """, sparams + cparams).df()
 
 
-def price_trends(source: str, event_id_external: str) -> pd.DataFrame:
+def price_trends(collection: str, source: str, event_id_external: str) -> pd.DataFrame:
     df = load("price_trends")
-    return (df[(df["source"] == source) & (df["event_id_external"] == event_id_external)]
+    return (df[(df["collection_slug"] == collection) & (df["source"] == source)
+               & (df["event_id_external"] == event_id_external)]
             .sort_values("crawl_ts_utc").reset_index(drop=True))
 
 
-def match_sparklines(sources=None) -> pd.DataFrame:
-    """Per-match daily best-price series (for inline table sparklines)."""
-    sf, params = _source_filter(sources)
-    where = "WHERE lowest_price IS NOT NULL AND match_number IS NOT NULL"
+def event_sparklines(collection: str | None = None, sources=None) -> pd.DataFrame:
+    """Per-event daily best-price series (for inline table sparklines)."""
+    sf, sparams = _filter(sources, "source")
+    cf, cparams = _filter(collection, "collection_slug")
+    clauses = ["lowest_price IS NOT NULL", "event_uid IS NOT NULL"]
     if sf:
-        where += f" AND {sf}"
+        clauses.append(sf)
+    if cf:
+        clauses.append(cf)
+    where = "WHERE " + " AND ".join(clauses)
     daily = _con().execute(f"""
-        SELECT match_number, crawl_date, MIN(lowest_price) AS best_price
+        SELECT collection_slug, event_uid, crawl_date, MIN(lowest_price) AS best_price
         FROM read_parquet('{_path('price_trends')}') {where}
-        GROUP BY 1, 2 ORDER BY 1, 2
-    """, params).df()
-    return (daily.groupby("match_number")["best_price"]
+        GROUP BY 1, 2, 3 ORDER BY 1, 2, 3
+    """, sparams + cparams).df()
+    if daily.empty:
+        return daily.assign(trend=pd.Series(dtype=object))
+    return (daily.groupby(["collection_slug", "event_uid"])["best_price"]
             .apply(lambda s: [float(v) for v in s]).rename("trend").reset_index())
 
 
-def daily_best(match_number: int, sources=None) -> pd.DataFrame:
-    """Daily best-across-sources price series for one match."""
-    sf, params = _source_filter(sources)
-    where = "WHERE lowest_price IS NOT NULL AND match_number = ?"
+def daily_best(event_uid: str, sources=None) -> pd.DataFrame:
+    """Daily best-across-sources price series for one canonical event."""
+    sf, params = _filter(sources, "source")
+    where = "WHERE lowest_price IS NOT NULL AND event_uid = ?"
     if sf:
         where += f" AND {sf}"
     return _con().execute(f"""
@@ -248,11 +335,12 @@ def daily_best(match_number: int, sources=None) -> pd.DataFrame:
                ARG_MIN(source, lowest_price) AS best_source, SUM(inventory_count) AS total_inventory
         FROM read_parquet('{_path('price_trends')}') {where}
         GROUP BY 1 ORDER BY 1
-    """, [int(match_number)] + params).df()
+    """, [event_uid] + params).df()
 
 
-def listing_distribution(source: str, event_id_external: str) -> pd.DataFrame:
+def listing_distribution(collection: str, source: str, event_id_external: str) -> pd.DataFrame:
     df = load("listings_latest")
-    out = df[(df["source"] == source) & (df["event_id_external"] == event_id_external)].copy()
+    out = df[(df["collection_slug"] == collection) & (df["source"] == source)
+             & (df["event_id_external"] == event_id_external)].copy()
     out["price"] = (out["listing_price_cents"] / 100.0).round(2)
     return out.sort_values("listing_price_cents").reset_index(drop=True)

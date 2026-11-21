@@ -2,7 +2,7 @@
 
 dbt warehouse (DuckDB) over the committed Parquet raw zone:
 bronze views (1:1 casts) → silver staging/core → gold analytics →
-semantic (dollars, dashboard surface). 18 ticket models + 4 mapping seeds.
+semantic (dollars, dashboard surface). 18 ticket models + 4 mapping seeds. All grains carry `(collection_slug, event_key)`; rows predating collections default to the FIFA collection in silver.
 
 ## Publishing
 
@@ -22,5 +22,5 @@ RAW_BASE_PATH=tests/fixtures dbt build --profiles-dir .   # CI fixtures
 ```
 
 Full-refresh throughout; switch facts to
-incremental merge on `(source, event_id_external, crawl_ts_utc)` when a
-full build approaches ~10 minutes (currently ~2 s on full history).
+incremental merge on `(collection_slug, source, event_id_external, crawl_ts_utc)`
+when a full build approaches ~10 minutes (currently seconds).

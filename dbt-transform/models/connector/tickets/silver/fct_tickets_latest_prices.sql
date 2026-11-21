@@ -6,13 +6,16 @@
 with latest as (
     select *,
         row_number() over (
-            partition by source, event_id_external
+            partition by collection_slug, source, event_id_external
             order by crawl_ts_utc desc
         ) as rn
     from {{ ref('clean_tickets_market_snapshots') }}
 )
 
 select
+    e.collection_slug,
+    e.event_key,
+    e.event_uid,
     e.source,
     e.event_id_external,
     e.event_url,
@@ -36,4 +39,5 @@ select
     s.lowest_price_includes_fees
 from {{ ref('clean_tickets_events') }} e
 left join latest s
-    on s.source = e.source and s.event_id_external = e.event_id_external and s.rn = 1
+    on s.collection_slug = e.collection_slug
+   and s.source = e.source and s.event_id_external = e.event_id_external and s.rn = 1

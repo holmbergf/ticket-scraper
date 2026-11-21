@@ -1,7 +1,8 @@
 {{ config(materialized='table') }}
 
--- Per-source current-market overview.
+-- Per-collection, per-source current-market overview.
 select
+    collection_slug,
     source,
     count(*) as total_events,
     count(lowest_price_cents) as events_with_price,
@@ -12,4 +13,4 @@ select
     sum(inventory_count) as total_inventory,
     max(latest_crawl_ts_utc) as last_crawl_ts_utc
 from {{ ref('fct_tickets_latest_prices') }}
-group by 1
+group by 1, 2

@@ -27,6 +27,8 @@ class Settings:
     # Raw HTML/JSON page snapshots for debugging. Gitignored, never committed:
     # pages are re-fetchable and would dwarf the Parquet raw zone.
     raw_html_dir: Path = REPO_ROOT / "data" / "raw_html"
+    # Collection definitions (one TOML file per tracked collection).
+    collections_dir: Path = REPO_ROOT / "collections"
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -34,6 +36,7 @@ class Settings:
         return cls(
             data_dir=data_dir,
             raw_html_dir=Path(os.getenv("RAW_HTML_DIR", str(data_dir / "raw_html"))),
+            collections_dir=Path(os.getenv("COLLECTIONS_DIR", str(REPO_ROOT / "collections"))),
         )
 
     @property

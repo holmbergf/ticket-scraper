@@ -1,7 +1,8 @@
 {{ config(materialized='view') }}
 
--- Semantic: daily market benchmarks in dollars (dashboard trend chart).
+-- Semantic: daily per-collection market benchmarks in dollars.
 select
+    collection_slug,
     crawl_date,
     round(min_price_cents / 100.0, 2) as min_price,
     round(median_price_cents / 100.0, 2) as median_price,

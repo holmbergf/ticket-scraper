@@ -18,7 +18,7 @@ from ticket_ingest.utils import (
 )
 
 
-EVENT_LINK_PATTERN = re.compile(r'href="(?P<href>/soccer/[^"]+/events/[A-Za-z0-9]+)[^"]*"', re.IGNORECASE)
+EVENT_LINK_PATTERN = re.compile(r'href="(?P<href>/[^"]+/events/[A-Za-z0-9]+)[^"]*"', re.IGNORECASE)
 LISTING_PATTERN = re.compile(
     r"(?:(?P<deal_label>Cheapest|Amazing Deal|Super Deal|Great Deal|Good Deal)\s+)?"
     r"(?P<section>(?:Category|CAT|Upper|Lower|Section)\s*[A-Za-z0-9\- ]{1,40}|[Uu]pper\s+\d{2,4}|[Ll]ower\s+\d{2,4})"
@@ -26,10 +26,17 @@ LISTING_PATTERN = re.compile(
     r"[^$]{0,120}?Includes Fees[^$]{0,30}?\$(?P<price>[\d,]+(?:\.\d{2})?)",
     re.IGNORECASE,
 )
+LISTING_CARD_PATTERN = re.compile(
+    r'<a\b(?P<attrs>[^>]*data-testid="listing-card-\d+"[^>]*)>(?P<body>.*?)</a>',
+    re.IGNORECASE | re.DOTALL,
+)
 
 
-def discover_events(html: str, page_url: str, crawl_ts_utc: str) -> ParseResult:
-    events, snapshots = _discover_from_json_ld(html, page_url, crawl_ts_utc)
+def discover_events(html: str, page_url: str, crawl_ts_utc: str,
+                    required_terms: tuple[str, ...] | None = None) -> ParseResult:
+    events, snapshots = _discover_from_json_ld(
+        html, page_url, crawl_ts_utc,
+        ("world cup", "fifa") if required_terms is None else required_terms)
 
     if not events:
         events, snapshots = _discover_from_links(html, page_url, crawl_ts_utc)
@@ -45,13 +52,15 @@ def discover_events(html: str, page_url: str, crawl_ts_utc: str) -> ParseResult:
 
 def _discover_from_json_ld(
     html: str, page_url: str, crawl_ts_utc: str,
+    required_terms: tuple[str, ...] = ("world cup", "fifa"),
 ) -> tuple[list[Event], list[MarketSnapshot]]:
     events: list[Event] = []
     snapshots: list[MarketSnapshot] = []
 
     for node in iter_sports_event_objects(html):
         event_name = clean_text(node.get("name"))
-        if not event_name or not _is_world_cup_event(event_name):
+        if not event_name or (required_terms and not any(
+                t.lower() in event_name.lower() for t in required_terms)):
             continue
         offers = node.get("offers") or {}
         if isinstance(offers, list):
@@ -155,9 +164,14 @@ def parse_event_page(html: str, page_url: str, crawl_ts_utc: str) -> ParseResult
     )
 
     page_text = strip_tags(html)
-    listings = _extract_listings(page_text, event.event_id_external, crawl_ts_utc)
+    listings = _extract_listings_from_cards(html, event.event_id_external, crawl_ts_utc)
+    if not listings:
+        listings = _extract_listings(page_text, event.event_id_external, crawl_ts_utc)
     lowest_price = min((listing.listing_price_cents for listing in listings), default=None)
-    if lowest_price is None:
+    if lowest_price is None and "Top Deals on Gametime" in page_text:
+        # Guarded fallback: extract_first_price_cents falls back to the
+        # first $ anywhere on the page (often a related event), so only
+        # trust it when the labelled deals section is actually present.
         lowest_price = extract_first_price_cents(page_text, "Top Deals on Gametime")
 
     snapshot = MarketSnapshot(
@@ -173,7 +187,7 @@ def parse_event_page(html: str, page_url: str, crawl_ts_utc: str) -> ParseResult
 
 
 def extract_event_name_from_url(url: str) -> str:
-    slug = url.rstrip("/").split("/events/", 1)[0].split("/soccer/", 1)[-1]
+    slug = url.rstrip("/").split("/events/", 1)[0].rstrip("/").rsplit("/", 1)[-1]
     slug = slug.replace("-tickets", "").replace("-", " ")
     return clean_text(slug.title())
 
@@ -193,6 +207,51 @@ def _extract_event_name_from_snippet(snippet: str) -> str | None:
 def _is_world_cup_event(name: str) -> bool:
     lower = name.lower()
     return "world cup" in lower or "fifa" in lower
+
+
+def _extract_listings_from_cards(html: str, event_id_external: str,
+                                 crawl_ts_utc: str) -> list[Listing]:
+    """Listings from rendered listing-card anchors (structured attrs).
+
+    The DOM carries price/section/row/deal in data-analytics attributes;
+    stripped text separates labels from prices, so the text regex cannot
+    associate them. Cards repeat (carousel + list + map pins); dedupe by
+    the marketplace listing id.
+    """
+
+    def attr(attrs: str, name: str) -> str | None:
+        m = re.search(rf'{re.escape(name)}="([^"]*)"', attrs)
+        return clean_text(m.group(1)) or None if m else None
+
+    by_id: dict[str, Listing] = {}
+    for match in LISTING_CARD_PATTERN.finditer(html):
+        attrs, body = match.group("attrs"), match.group("body")
+        listing_id = attr(attrs, "data-analytics-listing_id")
+        if not listing_id or listing_id in by_id:
+            continue
+        cents_m = re.search(r'<price-display[^>]*cents="(\d+)"', body)
+        dollars = attr(attrs, "data-analytics-displayed_price")
+        price = int(cents_m.group(1)) if cents_m else parse_money_to_cents(dollars)
+        if not price:
+            continue
+        zone_m = re.search(r'<h3[^>]*>(.*?)</h3>', body, re.IGNORECASE | re.DOTALL)
+        zone = clean_text(re.sub(r"<[^>]+>", " ", zone_m.group(1))) if zone_m else ""
+        section_no = attr(attrs, "data-analytics-payload_section") or ""
+        section = f"{zone} {section_no}".strip() if zone and section_no not in zone else (zone or section_no)
+        deal = attr(attrs, "data-analytics-payload_deal_type")
+        by_id[listing_id] = Listing(
+            source="gametime",
+            event_id_external=event_id_external,
+            crawl_ts_utc=crawl_ts_utc,
+            section=section or None,
+            row=attr(attrs, "data-analytics-payload_row"),
+            listing_price_cents=price,
+            deal_label={"super": "Super Deal", "amazing": "Amazing Deal",
+                        "great": "Great Deal", "good": "Good Deal",
+                        "cheapest": "Cheapest"}.get((deal or "").lower(), deal),
+            notes="includes-fees",
+        )
+    return list(by_id.values())
 
 
 def _extract_discovery_price(snippet: str) -> int | None:

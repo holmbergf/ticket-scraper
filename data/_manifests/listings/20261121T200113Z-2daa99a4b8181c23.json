@@ -1,0 +1,21 @@
+{
+  "run_id": "20261121T200113Z-2daa99a4b8181c23",
+  "dataset": "listings",
+  "source": "nfl-cowboys-at-seahawks-2026-12-07:vivid",
+  "written_at": "2026-11-21T20:01:13.931888+00:00",
+  "rows": 6,
+  "keys": [
+    "raw/listings/crawl_date=2026-11-21/part-7bb093eff672bde5.parquet"
+  ],
+  "skipped_keys": [],
+  "covered_crawl_ts": [
+    "2026-11-21T20:01:01Z"
+  ],
+  "sources": [
+    "vivid"
+  ],
+  "collections": [
+    "nfl-cowboys-at-seahawks-2026-12-07"
+  ],
+  "content_hash": "2daa99a4b8181c23"
+}

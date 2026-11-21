@@ -1,40 +1,49 @@
 {{ config(materialized='view') }}
 
--- Semantic: one row per match at current prices, dollars. The dashboard's
--- "all games / best deals" surface. best/worst/spread are over per-source
--- lowest prices; savings_vs_worst is null for single-source matches.
+-- Semantic: one row per canonical event at current prices, dollars.
+-- best/worst/spread are over per-source lowest prices;
+-- savings_vs_worst is null for single-source events.
 with priced as (
     select * from {{ ref('fct_tickets_latest_prices') }}
-    where lowest_price_cents is not null and match_number is not null
+    where lowest_price_cents is not null and event_key is not null
 ),
 
 agg as (
     select
-        match_number,
+        collection_slug,
+        event_uid,
         min(lowest_price_cents) as best_cents,
         max(lowest_price_cents) as worst_cents,
         count(*) as sources_with_price,
         sum(inventory_count) as total_inventory,
         max(latest_crawl_ts_utc) as latest_crawl_ts_utc
-    from priced group by 1
+    from priced group by 1, 2
 ),
 
 best_source as (
-    select match_number, source as best_source
+    select collection_slug, event_uid, source as best_source
     from (
-        select *, row_number() over (partition by match_number order by lowest_price_cents, source) as rn
+        select *, row_number() over (
+            partition by collection_slug, event_uid
+            order by lowest_price_cents, source) as rn
         from priced
     ) where rn = 1
 )
 
 select
+    d.collection_slug,
+    d.event_key,
+    d.event_uid,
     d.match_number,
     d.match_key,
     d.display_name,
     d.stage,
     d.team_1,
     d.team_2,
+    d.participant_1,
+    d.participant_2,
     d.event_start_local,
+    d.event_date,
     d.match_date,
     d.venue_name,
     d.city,
@@ -47,6 +56,6 @@ select
     case when a.sources_with_price >= 2 then round((a.worst_cents - a.best_cents) / 100.0, 2) end as savings_vs_worst,
     a.total_inventory,
     a.latest_crawl_ts_utc
-from {{ ref('dim_tickets_matches') }} d
-left join agg a using (match_number)
-left join best_source b using (match_number)
+from {{ ref('dim_tickets_events') }} d
+left join agg a using (collection_slug, event_uid)
+left join best_source b using (collection_slug, event_uid)

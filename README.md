@@ -1,13 +1,19 @@
 # ticket-scraper
 
-ELT pipeline for FIFA World Cup 2026 resale ticket prices: crawl five
-marketplaces, land partitioned Parquet **in this repository**, model it
-with dbt, and serve a Streamlit dashboard from the published semantic
-layer. The full history is ~4 MB of append-only Parquet partitions
-(~125 KB per crawl). Full design: [docs/architecture.md](docs/architecture.md).
+Generic ELT pipeline for resale ticket prices. A tracked tournament,
+single game, or multi-session event is a **collection** declared in
+[`collections/`](collections/); adding one TOML file (plus a thin
+workflow caller) stands up its crawl, warehouse rows, and dashboard
+pages without code changes. Two collections ship today: the FIFA World
+Cup 2026 (104 matches) and Cowboys at Seahawks, Dec 7 2026 (one game).
 
-Ingestion runs on demand (GitHub Actions `workflow_dispatch` or locally);
-there is no schedule — the tournament has concluded.
+The pipeline lands partitioned Parquet **in this repository**, models it
+with dbt, and serves a Streamlit dashboard from the published semantic
+layer — one generated page per canonical event. Full design:
+[docs/architecture.md](docs/architecture.md).
+
+Ingestion runs on demand per collection (GitHub Actions
+`workflow_dispatch` or locally); there are no schedules.
 
 ## Architecture
 
@@ -27,26 +33,34 @@ FIFA Collect ┘                          │
                        Streamlit dashboard (reads published Parquet only)
 ```
 
+- **Collections** ([`collections/`](collections/)): one TOML per tracked
+  collection — canonical events (optional), per-source discovery or
+  direct event URLs, expected counts, and fetch priorities. See
+  [`collections/README.md`](collections/README.md).
 - **Ingestion** ([`data-integration/`](data-integration/)): marketplace
-  parsers/fetch layer, landing as-fetched rows aligned to frozen
-  PyArrow schemas. Writes are content-addressed (`part-<hash>.parquet`) —
-  re-runs write zero new files. State lives in `data/_manifests/`.
-- **Warehouse** ([`dbt-transform/`](dbt-transform/)): 18 models — bronze
-  1:1 casts, silver normalization (seed-driven team/city/stage/country
-  mappings) + conformed match dim + facts, gold benchmarks/overviews/
-  price changes, semantic in dollars. Schema + singular data tests; CI
-  builds the exact production models on committed mock fixtures.
+  adapters composed with a collection's source settings at crawl time.
+  Rows are stamped with `collection_slug` + canonical `event_key` and
+  aligned to frozen PyArrow schemas. Writes are content-addressed
+  (`part-<hash>.parquet`) — re-runs write zero new files. State lives in
+  `data/_manifests/`.
+- **Warehouse** ([`dbt-transform/`](dbt-transform/)): bronze 1:1 casts,
+  silver normalization + conformed event dim keyed by
+  `(collection_slug, event_key)`, gold per-collection benchmarks, and a
+  semantic layer in dollars. Publishing also emits collection/event
+  catalogs that generate the dashboard's pages.
 - **Dashboard** ([`dashboard/`](dashboard/)): Streamlit app over the
-  semantic exports (scorecards, market trend, best deals, price history,
-  listing drill-down). Source filters recompute at read time. Exports
-  standalone for Streamlit Cloud via `dashboard/export_standalone.sh`.
+  semantic exports — a collections home, shared Market/Deals/History
+  analytics per collection, a collection overview, and one dedicated
+  page per canonical event. Exports standalone for Streamlit Cloud via
+  `dashboard/export_standalone.sh`.
 
 ## Repository structure
 
 ```text
 ticket-scraper/
+├── collections/            # One TOML per tracked collection + guide
 ├── data-integration/       # Ingestion package (ticket-ingest CLI)
-│   ├── src/ticket_ingest/  # parsers, http, schemas, storage, jobs, alerts
+│   ├── src/ticket_ingest/  # parsers, http, collections, schemas, storage, jobs
 │   ├── tests/              # pytest (committed HTML fixtures, offline)
 │   └── Dockerfile          # Stateless runner image
 ├── dbt-transform/          # dbt warehouse (DuckDB)
@@ -58,20 +72,22 @@ ticket-scraper/
 │   ├── raw/                # partitioned Parquet, append-only
 │   ├── _manifests/         # run manifests (pipeline state)
 │   └── data_warehouse/     # published serving exports
-└── .github/workflows/      # manual ingest + per-module CI
+└── .github/workflows/      # reusable ingest + per-collection callers + CI
 ```
 
 ## Operation
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `ingest` | Manual (`workflow_dispatch`, optional single source) | `ticket-ingest crawl` → `dbt build --target prod` → publish → commit `data/`; price-alert and failure issues |
-| `ci/data-integration` | Changes under `data-integration/**` | pytest, byte-compile, CLI smoke |
+| `ingest/fifa-world-cup-2026` | Manual | Crawl that collection (optional single source) |
+| `ingest/nfl-cowboys-at-seahawks-2026-12-07` | Manual | Crawl that collection |
+| `ingest (reusable)` | Called by the above / manual | crawl → `dbt build --target prod` → publish → commit `data/`; alert + failure issues |
+| `ci/data-integration` | `data-integration/**`, `collections/**` | pytest, byte-compile, CLI smoke |
 | `ci/dbt` | Changes under `dbt-transform/**` | Full dbt build + data tests on mock fixtures; slim selection vs prod manifest reported informationally |
 | `ci/dashboard` | Changes under `dashboard/**` | pytest data layer, byte-compile |
 
-CI workflows are path-filtered and independent. Ingestion has no
-schedule: the tournament has concluded, so crawls run on demand only.
+CI workflows are path-filtered and independent. Ingestion is manual
+per collection; there are no schedules.
 
 ## Local development
 
@@ -86,9 +102,13 @@ cp .env.example .env   # optional path overrides only; no secrets exist
 ```
 
 ```bash
-# Crawl (all sources, or one)
-ticket-ingest crawl
-ticket-ingest crawl --source gametime --max-events 5
+# Collections
+ticket-ingest collections list
+ticket-ingest collections validate nfl-cowboys-at-seahawks-2026-12-07
+
+# Crawl one collection (all its sources, or one)
+ticket-ingest crawl --collection fifa-world-cup-2026
+ticket-ingest crawl --collection nfl-cowboys-at-seahawks-2026-12-07 --source gametime
 
 # Warehouse
 cd dbt-transform && dbt build --target prod --profiles-dir . && cd ..
@@ -112,24 +132,29 @@ from pathlib import Path
 from ticket_ingest.storage import LocalStorage, StateStore
 
 state = StateStore(LocalStorage(Path("data")))
-print(state.crawl_timestamps()[-1], len(state.event_ids_for_source("stubhub")))
+print(state.crawl_timestamps()[-1],
+      len(state.event_ids_for_source("stubhub", "fifa-world-cup-2026")))
 ```
 
 ## Configuration
 
 Paths only (see [`.env.example`](.env.example)): `DATA_DIR`,
-`RAW_HTML_DIR`, `RAW_BASE_PATH`, `WAREHOUSE_DIR` — identical names locally
-and in GitHub Actions. The ingest workflow commits with the default
-`GITHUB_TOKEN`.
+`RAW_HTML_DIR`, `COLLECTIONS_DIR`, `RAW_BASE_PATH`, `WAREHOUSE_DIR` —
+identical names locally and in GitHub Actions. Ingest workflows commit
+with the default `GITHUB_TOKEN`.
 
 ## Data notes
 
-- Committed history covers 2026-04-04 → 2026-05-04 (154 crawls): 481
-  source events over 104 matches, 35,484 canonical market snapshots,
-  591,953 listings (4.3 MB of Parquet).
-- One canonical snapshot per (source, event, crawl): where a crawl
-  produces discovery-page and event-page rows under one timestamp, the
-  event-page row is kept (latest insert wins).
+- Canonical identity is `(collection_slug, event_key)` everywhere;
+  `event_uid` is the global form. FIFA rows written before collections
+  derive `match-<n>` keys in dbt silver, so no raw rewrite was needed.
+- FIFA history covers 2026-04-04 → 2026-05-04 (154 crawls): 481 source
+  events over 104 matches, 35,484 canonical market snapshots, 591,953
+  listings. The Cowboys collection adds live observations from its first
+  crawl (Gametime + Vivid priced; StubHub/Viagogo are WAF-gated and may
+  land event rows without snapshots from some networks).
+- One canonical snapshot per (collection, source, event, crawl): where a
+  crawl produces discovery-page and event-page rows under one timestamp,
+  the event-page row is kept (latest insert wins).
 - Prices are integer cents until the semantic layer. Raw schemas are
   frozen contracts in `ticket_ingest/schemas.py`.
-- `match_number` (1–104) is the conformed cross-source match key.

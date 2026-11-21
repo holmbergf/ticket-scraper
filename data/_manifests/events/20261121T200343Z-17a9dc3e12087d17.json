@@ -1,0 +1,19 @@
+{
+  "run_id": "20261121T200343Z-17a9dc3e12087d17",
+  "dataset": "events",
+  "source": "nfl-cowboys-at-seahawks-2026-12-07:gametime",
+  "written_at": "2026-11-21T20:03:43.052494+00:00",
+  "rows": 1,
+  "keys": [],
+  "skipped_keys": [
+    "raw/events/source=gametime/part-0107b7a96174d164.parquet"
+  ],
+  "covered_crawl_ts": [],
+  "sources": [
+    "gametime"
+  ],
+  "collections": [
+    "nfl-cowboys-at-seahawks-2026-12-07"
+  ],
+  "content_hash": "17a9dc3e12087d17"
+}

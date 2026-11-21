@@ -1,9 +1,11 @@
 # Architecture
 
-End-to-end architecture of ticket-scraper: how FIFA World Cup 2026 resale
-ticket prices move from five marketplaces to a dashboard. The git
-repository is the storage layer. For a quick start see the
-[README](../README.md).
+End-to-end architecture of ticket-scraper: how resale ticket prices for
+any tracked collection — a tournament, a single game, or a multi-session
+event — move from marketplaces to a dashboard with one generated page per
+canonical event. The git repository is the storage layer. For a quick
+start see the [README](../README.md); for adding a collection see
+[`collections/README.md`](../collections/README.md).
 
 ## 1. Overview and design principles
 
@@ -16,9 +18,11 @@ flowchart LR
         VG[Viagogo Playwright]
         FC[FIFA Collect JSON API]
     end
+    CFG["collections/*.toml"]
     subgraph Ingestion["Ingestion (Python, ticket-ingest)"]
-        J[jobs: per-source crawl]
+        J[jobs: per-collection, per-source crawl]
     end
+    CFG --> J
     subgraph Repo["Git repository (storage layer)"]
         RAW["data/raw/ partitioned Parquet + _manifests/"]
         WH["data/data_warehouse/ published Parquet"]
@@ -36,6 +40,9 @@ flowchart LR
 
 Design principles:
 
+- **Collections are configuration.** A new tracked tournament/game/event
+  is a TOML file plus a thin workflow caller — never new pipeline code.
+  Canonical identity is `(collection_slug, event_key)` everywhere.
 - **ELT, not ETL.** Sources land close to native shape ("raw"); all
   shaping happens in dbt. A transformation bug never requires re-scraping.
 - **Idempotency everywhere.** Every write is content-addressed or a full
@@ -45,7 +52,7 @@ Design principles:
   derive from run manifests committed next to the data.
 - **Derived data is disposable.** Everything downstream of `data/raw/`
   rebuilds from it in seconds. Raw is the only irreplaceable layer.
-- **Manual ingestion.** Crawls run on demand; there is no schedule.
+- **Manual ingestion.** Crawls run on demand per collection; no schedules.
 
 ## 2. Storage shape
 
@@ -66,35 +73,46 @@ Two guardrails:
    rebuild over unchanged raw data is byte-identical and a no-op ingest
    produces an empty commit.
 
-## 3. Sources
+## 3. Sources and collection modes
 
-| Source | Access | Coverage |
-|---|---|---|
-| Vivid Seats | Headless Chrome (`--dump-dom`) | ~91 matches |
-| Gametime | Plain HTTP | 104 matches |
-| StubHub | Playwright (AWS WAF needs full JS); city sub-pages sequential @ 10 s gaps + 45 s challenge backoff | ~91 matches |
-| Viagogo | Playwright, event URLs cross-built from StubHub ids | ~91 matches |
-| FIFA Collect | JSON API (`collect.fifa.com` RTT marketplace) | 104 matches |
+Marketplace adapters are fixed; collections choose how each source is
+driven:
+
+| Mode | Behavior |
+|---|---|
+| `discovery` | Fetch a performer/category page, keep events that resolve to declared canonical events (or derive keys when none are declared), then fetch their event pages |
+| `event_urls` | Fetch declared event pages directly — the reliable path for one-off games |
+| `cross_source` | Build event URLs from another source's ids via `event_url_template` (Viagogo from StubHub) |
+
+| Source | Access notes |
+|---|---|
+| Vivid Seats | Headless Chrome (`--dump-dom`) |
+| Gametime | HTTP for static pages; Playwright + `event_wait_selector` where listings render client-side |
+| StubHub | Playwright (AWS WAF); optional sub-page expansion with sequential gaps + challenge backoff |
+| Viagogo | Playwright; often cross-built from StubHub ids |
+| FIFA Collect | JSON API (`collect.fifa.com` RTT marketplace); FIFA collection only |
 
 Rate-limit rule: repeated crawls more often than ~60 s can trigger
 StubHub/Viagogo WAF IP blocks.
 
 ## 4. Ingestion (`data-integration/`)
 
-Python package `ticket_ingest`, CLI `ticket-ingest {crawl,migrate-sqlite}`.
+Python package `ticket_ingest`, CLI
+`ticket-ingest {crawl --collection, collections list|validate, migrate-sqlite}`.
 
 | Module | Responsibility |
 |---|---|
 | `config.py` | `Settings` from env (paths only) |
+| `collections.py` | TOML collection loading/validation + canonical-event resolution |
 | `parsers/` | Per-marketplace discovery + event parsing (raw, unnormalized) |
-| `http.py` | urllib3 pool, Chrome, Playwright (per-domain throttle, cookie persistence, retries) |
-| `models.py` | `Event` / `MarketSnapshot` / `Listing` / `ParseResult` |
+| `http.py` | urllib3 pool, Chrome, Playwright (throttle, cookies, retries, wait selectors) |
+| `models.py` | `Event` / `MarketSnapshot` / `Listing` / `ParseResult`, all carrying collection identity |
 | `schemas.py` | **Frozen PyArrow raw schemas** — the ingestion↔bronze contract |
 | `clean.py` | Content hash, natural-key dedupe |
 | `storage.py` | Partitioned Parquet writes, manifests, `StateStore` |
-| `jobs.py` | Per-source orchestration (parallel sources; Viagogo after StubHub) |
-| `alerts.py` | Snapshot diffs + alert rules over raw (DuckDB) |
-| `publish_warehouse.py` | DuckDB → `data_warehouse/` Parquet exports |
+| `jobs.py` | Adapter × collection composition; per-source orchestration |
+| `alerts.py` | Per-collection snapshot diffs + alert rules over raw (DuckDB) |
+| `publish_warehouse.py` | DuckDB → `data_warehouse/` Parquet exports + collection/event catalogs |
 | `migrate.py` | SQLite → Parquet raw-zone import (idempotent) |
 
 Write path per source crawl:
@@ -104,9 +122,9 @@ sequenceDiagram
     participant Job
     participant Src as Marketplace
     participant Raw as data/raw + _manifests
-    Job->>Src: discovery + event pages (parallel, prioritized)
+    Job->>Src: discovery or declared event URLs (parallel, prioritized)
     Src-->>Job: HTML/JSON
-    Job->>Job: parse, dedupe to natural keys, align to frozen schema
+    Job->>Job: parse, resolve canonical events, dedupe, align to frozen schema
     Job->>Raw: put part-<content_hash>.parquet per partition (skip if exists)
     Job->>Raw: put _manifests/<dataset>/<run_id>.json
     Job->>Job: diff vs previous crawl → alerts.json
@@ -140,22 +158,23 @@ local `.duckdb` file. There is no warehouse server.
 |---|---|---|
 | bronze (views) | `stg_tickets_events`, `stg_tickets_market_snapshots`, `stg_tickets_listings` | 1:1 casts of the frozen schemas; a raw break fails here |
 | silver staging | `clean_tickets_events` (normalize + collapse), `clean_tickets_market_snapshots`, `clean_tickets_listings` (bogus-row filter) | All source ugliness resolved here; mappings are seeds |
-| silver core | `dim_tickets_matches` (1 row/match), `fct_tickets_market_snapshots`, `fct_tickets_latest_prices`, `fct_tickets_listings_latest` | Integer cents; `match_number` is the conformed cross-source key (100% populated, 104 matches) |
-| gold | `analytics_tickets_market_benchmarks`, `…_source_overviews`, `…_price_changes` | Pre-aggregated marts, still cents |
-| semantic (views) | `semantic_match_prices`, `semantic_source_prices`, `semantic_price_trends`, `semantic_market_trends`, `semantic_source_overview` | **Only layer in dollars**; the dashboard's surface |
+| silver core | `dim_tickets_events` (1 row/canonical event), `fct_tickets_market_snapshots`, `fct_tickets_latest_prices`, `fct_tickets_listings_latest` | Integer cents; `(collection_slug, event_key)` is the conformed cross-source key |
+| gold | `analytics_tickets_market_benchmarks`, `…_source_overviews`, `…_price_changes` | Per-collection pre-aggregated marts, still cents |
+| semantic (views) | `semantic_event_prices`, `semantic_source_prices`, `semantic_price_trends`, `semantic_market_trends`, `semantic_source_overview` | **Only layer in dollars**; the dashboard's surface |
 
 Tests as contracts: schema tests on grains/keys plus
 singular SQL tests named for the failure they prevent —
 `clean_events_grain` (raw versions must collapse or facts fan out),
 `snapshots_have_events` (join coverage; unmatched snapshots would vanish
 silently), `prices_positive` (parsers store null, never 0),
-`semantic_dollars_match_cents`, `match_prices_best_is_min`,
-`latest_prices_grain`. CI runs the full build against committed mock raw
-fixtures (matches 1/2/4, three crawl dates) with no credentials.
+`semantic_dollars_match_cents`, `event_prices_best_is_min`,
+`latest_prices_grain`, `dim_display_names_unique`. CI runs the full build
+against committed mock raw fixtures (pre-collection schema generation,
+so backward compatibility is tested) with no credentials.
 
 Full-refresh throughout; exit to incremental merge on
-`(source, event_id_external, crawl_ts_utc)` when a build nears ~10 min
-(it takes ~2 s on the full committed history).
+`(collection_slug, source, event_id_external, crawl_ts_utc)` when a build
+nears ~10 min (it takes seconds on the full committed history).
 
 Metric definitions:
 
@@ -169,35 +188,41 @@ Metric definitions:
 ## 6. Publishing
 
 `python -m ticket_ingest.publish_warehouse [warehouse.duckdb]` exports the
-15 registered models to `data/data_warehouse/<layer>/<table>.parquet`
+registered models to `data/data_warehouse/<layer>/<table>.parquet`
 (zstd, `ORDER BY ALL`, all-null columns cast to string for a stable
-schema). The Parquet export is the serving contract — for the dashboard
-and any other file reader.
+schema), then builds `semantic_collections` and `semantic_event_catalog`
+from the collection TOML files merged with the warehouse dimension — so
+a configured collection/event exists in the serving layer even before
+its first crawl. The Parquet export is the serving contract.
 
 ## 7. Dashboard (`dashboard/`)
 
 Streamlit app reading only published exports via `dashboard/data.py`
 (DuckDB over Parquet; `WAREHOUSE_DIR` / bundled layout / repo layout).
-Source-subset views are recomputed at read time from the published
-semantic tables. The exports it needs are committed to this repo, so the
-app needs no credentials. For Streamlit Community Cloud,
-`export_standalone.sh` bundles the app + the serving Parquet snapshot
-into a standalone repo.
+Navigation is generated from the published catalogs: shared
+Home/Market/Deals/History analytics (scoped by the sidebar collection
+selector), one overview per collection, and one dedicated page per
+canonical event (`event-<collection>--<event_key>`). Source-subset views
+recompute at read time. The exports are committed, so the app needs no
+credentials. For Streamlit Community Cloud, `export_standalone.sh`
+bundles the app + the serving Parquet snapshot into a standalone repo
+(`fholmberg/ticket-scraper-dashboard`).
 
 ## 8. Orchestration and CI
 
-One manual ingest workflow + three path-filtered CI workflows (a change
-to one module never runs another's CI):
+One reusable ingest workflow, a thin manual caller per collection, and
+three path-filtered CI workflows:
 
 | Workflow | Trigger | Gate / job |
 |---|---|---|
-| `ingest` | Manual (`workflow_dispatch`, optional single source) | crawl (shell `retry` ×3 — safe, writes are content-addressed) → dbt build prod → publish → commit data zones → alert/failure GitHub issues; uploads warehouse + dbt manifest artifacts |
-| `ci/data-integration` | `data-integration/**` | pytest (committed HTML fixtures), byte-compile, CLI smoke |
+| `ingest-<slug>` (per collection) | Manual | Calls the reusable workflow with its collection slug |
+| `ingest (reusable)` | `workflow_call` / manual | validate collection → crawl (shell `retry` ×3) → dbt build prod → publish → commit data zones → alert/failure issues |
+| `ci/data-integration` | `data-integration/**`, `collections/**` | pytest, byte-compile, CLI smoke |
 | `ci/dbt` | `dbt-transform/**` | Full dbt build + data tests on mock fixtures; slim selection vs prod manifest reported informationally |
 | `ci/dashboard` | `dashboard/**` | pytest data layer, byte-compile |
 
-A concurrency group serializes ingest runs. Ingestion has no schedule:
-the tournament has concluded, so crawls run on demand only.
+A per-collection concurrency group serializes each collection's runs.
+Ingestion is manual; there are no schedules.
 
 ## 9. Technology choices
 
@@ -207,5 +232,6 @@ the tournament has concluded, so crawls run on demand only.
 | Landing format | Parquet (zstd), hive partitions | Columnar, self-describing, content-addressable; DuckDB reads it natively |
 | Ingestion | Python (`ticket-ingest`) | Parsers/fetch for the five marketplaces |
 | Transformation | dbt (SQL) on DuckDB | Declared graph, tests as contracts; embedded, no server |
-| Orchestration | GitHub Actions (manual dispatch) | Also the committer of the storage layer |
+| Orchestration | GitHub Actions reusable workflow + per-collection callers | Also the committer of the storage layer |
+| Collection config | TOML in `collections/` | Stdlib-parsed; drives crawl, publish catalogs, and dashboard pages |
 | BI | Streamlit over published Parquet | Reads the semantic serving exports |

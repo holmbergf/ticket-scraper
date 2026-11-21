@@ -1,8 +1,10 @@
 {{ config(materialized='view') }}
 
--- Semantic: full price history per (source, event) in dollars, for trend
--- charts.
+-- Semantic: full price history per (collection, source, event) in dollars.
 select
+    f.collection_slug,
+    f.event_key,
+    f.event_uid,
     f.source,
     f.event_id_external,
     f.match_number,
@@ -16,6 +18,7 @@ select
     f.inventory_count
 from {{ ref('fct_tickets_market_snapshots') }} f
 left join {{ ref('clean_tickets_events') }} e
-    on e.source = f.source and e.event_id_external = f.event_id_external
-left join {{ ref('dim_tickets_matches') }} d
-    on d.match_number = f.match_number
+    on e.collection_slug = f.collection_slug
+   and e.source = f.source and e.event_id_external = f.event_id_external
+left join {{ ref('dim_tickets_events') }} d
+    on d.collection_slug = f.collection_slug and d.event_uid = f.event_uid

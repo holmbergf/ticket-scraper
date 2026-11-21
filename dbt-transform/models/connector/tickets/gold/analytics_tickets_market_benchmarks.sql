@@ -1,21 +1,22 @@
 {{ config(materialized='table') }}
 
--- Per-crawl-date market benchmarks: best (= cheapest across sources)
--- price per match per day, then min/median/avg/max over matches. Daily
--- best is over canonical per-crawl snapshots only (event-page rows), so
--- discovery-page featured prices never set the market low.
+-- Per-collection, per-crawl-date market benchmarks: best (= cheapest
+-- across sources) price per canonical event per day, then
+-- min/median/avg/max over events in that collection.
 with daily_best as (
     select
+        collection_slug,
         crawl_date,
-        match_key,
+        event_uid,
         min(lowest_price_cents) as best_price_cents,
         sum(inventory_count) as total_inventory
     from {{ ref('fct_tickets_market_snapshots') }}
     where lowest_price_cents is not null
-    group by 1, 2
+    group by 1, 2, 3
 )
 
 select
+    collection_slug,
     crawl_date,
     min(best_price_cents) as min_price_cents,
     cast(median(best_price_cents) as bigint) as median_price_cents,
@@ -24,4 +25,4 @@ select
     count(*) as total_events,
     sum(total_inventory) as total_inventory
 from daily_best
-group by 1
+group by 1, 2
