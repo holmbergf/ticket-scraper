@@ -1,0 +1,33 @@
+name: ci/dashboard
+
+on:
+  push:
+    branches: [main]
+    paths: ["dashboard/**", ".github/workflows/dashboard.yml"]
+  pull_request:
+    paths: ["dashboard/**", ".github/workflows/dashboard.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-dashboard-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install
+        run: pip install -r dashboard/requirements.txt pytest
+      - name: Data-layer tests (synthetic published exports)
+        run: python -m pytest dashboard/tests -q
+      - name: Byte-compile
+        run: python -m compileall -q dashboard/streamlit_app.py dashboard/data.py

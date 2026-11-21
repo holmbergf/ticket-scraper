@@ -1,0 +1,58 @@
+name: ci/dbt
+
+on:
+  push:
+    branches: [main]
+    paths: ["dbt-transform/**", ".github/workflows/dbt.yml"]
+  pull_request:
+    paths: ["dbt-transform/**", ".github/workflows/dbt.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read # fetch prod manifest artifact for slim selection
+
+concurrency:
+  group: ci-dbt-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dbt
+        run: pip install dbt-duckdb duckdb
+      # Slim selection is computed against the production manifest from the
+      # latest successful ingest run and reported below, but the build
+      # itself is full: CI DuckDB is ephemeral, and slim selection produces
+      # false failures when singular tests reference tables outside the
+      # selection (elt-pipeline lesson). The full fixture build is <2 min.
+      - name: Fetch prod manifest (slim state)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p prod-state
+          run_id=$(gh run list --workflow ingest.yml --status success --limit 1 --json databaseId --jq '.[0].databaseId' || true)
+          if [ -n "$run_id" ] && [ "$run_id" != "null" ]; then
+            gh run download "$run_id" --name dbt-state --dir prod-state || true
+          fi
+          ls prod-state || true
+      - name: dbt build on mock raw fixtures
+        working-directory: dbt-transform
+        env:
+          RAW_BASE_PATH: ${{ github.workspace }}/dbt-transform/tests/fixtures
+        run: |
+          if [ -f ../prod-state/manifest.json ]; then
+            echo "Changed vs prod (slim selection, informational):"
+            dbt ls --profiles-dir . --select +state:modified+ --state ../prod-state --resource-type model --output name || true
+          else
+            echo "No prod manifest found; full build on fixtures"
+          fi
+          dbt build --profiles-dir .

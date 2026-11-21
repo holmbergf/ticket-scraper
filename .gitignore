@@ -1,0 +1,48 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# dbt / DuckDB artifacts
+target/
+logs/
+*.duckdb
+*.duckdb.wal
+dbt_packages/
+
+# Raw HTML page snapshots: local debugging only, re-fetchable, never committed
+data/raw_html/
+
+# Derived silver mirrors: published locally and as CI artifacts, but not
+# committed — history-scale derived tables would re-bloat git history on
+# every publish. The committed warehouse zone is the serving set only
+# (semantic/*, gold/*, silver/fct_tickets_listings_latest.parquet).
+# Everything ignored here is rebuildable from data/raw in seconds.
+data/data_warehouse/silver/clean_*.parquet
+data/data_warehouse/silver/fct_tickets_market_snapshots.parquet
+data/data_warehouse/silver/fct_tickets_latest_prices.parquet
+data/data_warehouse/silver/dim_tickets_matches.parquet
+
+# NOTE: data/raw/**, data/_manifests/** and the serving exports above ARE
+# committed — the repository is the storage layer (see docs/architecture.md).
+
+# Ephemeral CI artifacts
+alerts.json
+
+# Streamlit secrets
+.streamlit/secrets.toml
+dashboard/.streamlit/secrets.toml
+
+# OS / editors
+.DS_Store
+Thumbs.db

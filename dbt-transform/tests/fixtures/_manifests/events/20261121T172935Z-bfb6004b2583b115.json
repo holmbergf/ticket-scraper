@@ -1,0 +1,24 @@
+{
+  "run_id": "20261121T172935Z-bfb6004b2583b115",
+  "dataset": "events",
+  "source": "fixture-gen:/tmp/gen_fixtures.py",
+  "written_at": "2026-11-21T17:29:35.661062+00:00",
+  "rows": 13,
+  "keys": [
+    "raw/events/source=fifacollect/part-7e8b08dbbc36f1cd.parquet",
+    "raw/events/source=gametime/part-4a38bdd2d75d23d3.parquet",
+    "raw/events/source=stubhub/part-b1ee5fae75aedb54.parquet",
+    "raw/events/source=viagogo/part-e496ee906c3588b0.parquet",
+    "raw/events/source=vivid/part-cbfd9c07a5a7d421.parquet"
+  ],
+  "skipped_keys": [],
+  "covered_crawl_ts": [],
+  "sources": [
+    "fifacollect",
+    "gametime",
+    "stubhub",
+    "viagogo",
+    "vivid"
+  ],
+  "content_hash": "bfb6004b2583b115"
+}

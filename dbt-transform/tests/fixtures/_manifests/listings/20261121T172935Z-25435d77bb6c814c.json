@@ -1,0 +1,23 @@
+{
+  "run_id": "20261121T172935Z-25435d77bb6c814c",
+  "dataset": "listings",
+  "source": "fixture-gen:/tmp/gen_fixtures.py",
+  "written_at": "2026-11-21T17:29:35.687260+00:00",
+  "rows": 47,
+  "keys": [
+    "raw/listings/crawl_date=2026-05-04/part-9d6c89f26139d96f.parquet"
+  ],
+  "skipped_keys": [],
+  "covered_crawl_ts": [
+    "2026-05-04T02:38:16Z",
+    "2026-05-04T10:12:42Z",
+    "2026-05-04T10:25:59Z"
+  ],
+  "sources": [
+    "fifacollect",
+    "gametime",
+    "stubhub",
+    "viagogo"
+  ],
+  "content_hash": "25435d77bb6c814c"
+}
