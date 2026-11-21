@@ -42,6 +42,25 @@ def warehouse_dir() -> Path:
     return bundled if bundled.exists() else _REPO_ROOT / "data" / "data_warehouse"
 
 
+def warehouse_version() -> str:
+    """Content stamp of the published warehouse (mtime+size per serving file).
+
+    Every publish rewrites these files, so the stamp changes whenever new
+    data lands. The app passes it as an explicit argument to its cached
+    loaders, which means long-lived caches can never keep showing
+    pre-publish prices after a publish.
+    """
+    parts = []
+    for rel in TABLES.values():
+        p = warehouse_dir() / rel
+        try:
+            s = p.stat()
+            parts.append(f"{rel}:{s.st_mtime_ns}:{s.st_size}")
+        except OSError:
+            parts.append(f"{rel}:missing")
+    return "|".join(parts)
+
+
 def _path(table: str) -> Path:
     p = warehouse_dir() / TABLES[table]
     if not p.exists():
@@ -201,6 +220,35 @@ def price_trends(source: str, event_id_external: str) -> pd.DataFrame:
     df = load("price_trends")
     return (df[(df["source"] == source) & (df["event_id_external"] == event_id_external)]
             .sort_values("crawl_ts_utc").reset_index(drop=True))
+
+
+def match_sparklines(sources=None) -> pd.DataFrame:
+    """Per-match daily best-price series (for inline table sparklines)."""
+    sf, params = _source_filter(sources)
+    where = "WHERE lowest_price IS NOT NULL AND match_number IS NOT NULL"
+    if sf:
+        where += f" AND {sf}"
+    daily = _con().execute(f"""
+        SELECT match_number, crawl_date, MIN(lowest_price) AS best_price
+        FROM read_parquet('{_path('price_trends')}') {where}
+        GROUP BY 1, 2 ORDER BY 1, 2
+    """, params).df()
+    return (daily.groupby("match_number")["best_price"]
+            .apply(lambda s: [float(v) for v in s]).rename("trend").reset_index())
+
+
+def daily_best(match_number: int, sources=None) -> pd.DataFrame:
+    """Daily best-across-sources price series for one match."""
+    sf, params = _source_filter(sources)
+    where = "WHERE lowest_price IS NOT NULL AND match_number = ?"
+    if sf:
+        where += f" AND {sf}"
+    return _con().execute(f"""
+        SELECT crawl_date, MIN(lowest_price) AS best_price,
+               ARG_MIN(source, lowest_price) AS best_source, SUM(inventory_count) AS total_inventory
+        FROM read_parquet('{_path('price_trends')}') {where}
+        GROUP BY 1 ORDER BY 1
+    """, [int(match_number)] + params).df()
 
 
 def listing_distribution(source: str, event_id_external: str) -> pd.DataFrame:

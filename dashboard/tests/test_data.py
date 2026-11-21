@@ -86,6 +86,14 @@ def test_market_trends_and_price_changes_from_published(warehouse):
     assert changes.iloc[0]["first_price"] == 120.0 and changes.iloc[0]["latest_price"] == 100.0
 
 
+def test_sparklines_and_daily_best(warehouse):
+    spark = warehouse.match_sparklines(["vivid"])
+    assert spark.iloc[0]["trend"] == [120.0, 100.0]
+    daily = warehouse.daily_best(1, ["vivid"])
+    assert daily["best_price"].tolist() == [120.0, 100.0]
+    assert warehouse.warehouse_version()  # non-empty stamp over serving files
+
+
 def test_listing_distribution_dollars(warehouse):
     df = warehouse.listing_distribution("vivid", "e1")
     assert df.iloc[0]["price"] == 110.0
