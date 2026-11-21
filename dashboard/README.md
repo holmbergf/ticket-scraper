@@ -4,9 +4,28 @@ Dashboard over the semantic layer (`semantic_match_prices`,
 `semantic_source_prices`, `semantic_price_trends`). It reads only the
 published Parquet exports (`data/data_warehouse/`) — never the raw zone.
 
-Sections: scorecards, market trend, per-source overview, all-games scatter,
-best deals, all-games table with price-change deltas, price by stage/city,
-days-to-kickoff curves, per-game price history, listing drill-down.
+Four pages (sidebar radio), with global source/stage/city/team filters:
+
+- **Matches** — a match "card" (team-vs-team header, metric tiles,
+  inventory share bar, per-source price bars, benchmark compare bars, and a
+  price-context expander) over a clickable all-games table with daily-best
+  sparklines. Tick a row's checkbox to load that match; sort by kickoff,
+  cheapest, or biggest drop.
+- **Market** — scorecards, market price trend (median/average/cheapest,
+  zoomable), price by source, stage, and city (+ map in an expander).
+- **Deals** — cross-source savings, biggest first-to-latest drops, and the
+  current price distribution, as switchable views.
+- **History** — per-game price lines by source against the tournament
+  median, days-to-kickoff comparison curves, and a listing drill-down
+  with section medians.
+
+Design language: dark theme (`.streamlit/config.toml`), narrow 1180px
+content column, custom metric-card CSS, per-source colors used
+consistently across bars/tables/legends, buyer-colored deltas
+(green = cheaper, always captioned), and Altair charts with tooltips
+throughout (Plotly only for the city map). Data loads are cached for an
+hour, keyed on a published-exports version stamp so a publish is picked
+up immediately.
 
 ## Data path
 
