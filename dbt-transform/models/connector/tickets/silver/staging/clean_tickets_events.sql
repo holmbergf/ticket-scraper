@@ -2,8 +2,10 @@
 
 -- Silver staging: all source-specific ugliness is resolved here. Raw
 -- events are append-only across crawls, so first collapse to one row per
--- (source, event): prefer the most complete version, then the latest
--- import. Team/city/stage/
+-- (collection, source, event): prefer the most complete version, then
+-- the latest import. Rows predating collections default to the FIFA
+-- World Cup collection and derive event_key from match_number.
+-- Team/city/stage/
 -- country canonicalisation goes through seed mappings; unmapped values
 -- pass through visibly rather than being fuzzy-matched.
 with ranked as (
@@ -17,7 +19,8 @@ with ranked as (
        + case when venue_name is not null then 1 else 0 end
        + case when city is not null then 1 else 0 end) as completeness,
         row_number() over (
-            partition by source, event_id_external
+            partition by coalesce(nullif(collection_slug, ''), 'fifa-world-cup-2026'),
+                         source, event_id_external
             order by completeness desc, timestamp_imported desc
         ) as rn
     from {{ ref('stg_tickets_events') }}
@@ -40,6 +43,12 @@ stripped as (
 
 normalized as (
     select
+        coalesce(nullif(s.collection_slug, ''), 'fifa-world-cup-2026') as collection_slug,
+        case
+            when nullif(s.event_key, '') is not null then s.event_key
+            when s.match_number is not null then 'match-' || s.match_number
+            else s.source || '-' || s.event_id_external
+        end as event_key,
         s.source,
         s.event_id_external,
         s.event_url,
@@ -73,24 +82,22 @@ select
     case
         when team_1 is not null and team_2 is not null and team_1 <> 'TBD' and team_2 <> 'TBD'
             then team_1 || ' vs ' || team_2 || coalesce(' (' || stage || ')', '')
-        -- Knockout fixtures are listed before the teams are known. Name
-        -- them by round and host city (e.g. "Quarter-Final — Seattle")
-        -- rather than by an opaque match number. dim_tickets_matches adds
-        -- the date when the same round/city hosts more than one match.
-        when stage in ('Round of 32', 'Round of 16', 'Quarter-Final',
-                       'Semi-Final', 'Bronze Final', 'Final')
-             and city is not null
+        -- Fixtures listed before participants are known are named by
+        -- stage/session and host city (e.g. "Quarter-Final — Seattle")
+        -- rather than by an opaque sequence number. dim_tickets_events
+        -- adds the date when that label describes more than one event.
+        when stage is not null and city is not null
             then stage || ' — ' || city
-        when match_number is not null
-            then 'Match ' || match_number || coalesce(' (' || stage || ')', '')
         when event_name is not null
             then nullif(trim(regexp_replace(regexp_replace(regexp_replace(
                     event_name, '^[A-Za-z ]+(,\s*[A-Z]{2})?\s*-\s*', ''),
                     '\s*\|.*$', ''), 'Tickets$', '')), '')
+        when match_number is not null
+            then 'Match ' || match_number || coalesce(' (' || stage || ')', '')
         else 'Unknown'
     end as display_name,
-    -- Cross-source key: match_number is populated for every source (104
-    -- matches), so it is the conformed match identifier downstream.
-    case when match_number is not null then 'match-' || match_number
-         else source || '-' || event_id_external end as match_key
+    -- Global canonical identity. match_key is kept as the same value for
+    -- compatibility with earlier published tables.
+    collection_slug || ':' || event_key as event_uid,
+    collection_slug || ':' || event_key as match_key
 from normalized

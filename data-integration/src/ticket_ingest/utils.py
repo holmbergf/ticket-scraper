@@ -36,7 +36,7 @@ def strip_tags(value: str | None) -> str:
 PLAIN_NUMBER_PATTERN = re.compile(r"^[\d,]+(?:\.\d{1,2})?$")
 TITLE_PATTERN = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
 EVENT_ID_PATTERN = re.compile(r"[A-Za-z0-9_-]{6,}")
-MATCHUP_PATTERN = re.compile(r"(.+?)\s+vs\.?\s+(.+?)(?:\s+-\s+|\s+\(|$)", re.IGNORECASE)
+MATCHUP_PATTERN = re.compile(r"(.+?)\s+(?:vs\.?|at|@)\s+(.+?)(?:\s+-\s+|\s+\(|$)", re.IGNORECASE)
 MATCH_NUMBER_PATTERN = re.compile(r"\bMatch\s+(\d+)\b", re.IGNORECASE)
 PAREN_PATTERN = re.compile(r"\(([^)]+)\)")
 

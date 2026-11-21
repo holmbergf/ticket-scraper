@@ -12,11 +12,12 @@ import json
 
 import pandas as pd
 
-# Natural keys: one row per key within a single crawl batch.
-EVENTS_NATURAL_KEY = ["source", "event_id_external"]
-SNAPSHOTS_NATURAL_KEY = ["source", "event_id_external", "crawl_ts_utc"]
+# Natural keys: one row per key within a single crawl batch. External ids
+# are only unique inside a collection, so every key carries the slug.
+EVENTS_NATURAL_KEY = ["collection_slug", "source", "event_id_external"]
+SNAPSHOTS_NATURAL_KEY = ["collection_slug", "source", "event_id_external", "crawl_ts_utc"]
 LISTINGS_NATURAL_KEY = [
-    "source", "event_id_external", "crawl_ts_utc",
+    "collection_slug", "source", "event_id_external", "crawl_ts_utc",
     "listing_price_cents", "section", "row",
 ]
 

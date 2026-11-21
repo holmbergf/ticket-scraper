@@ -117,7 +117,7 @@ _STUBHUB_CITY_SUBPAGES: list[str] = [
 ]
 
 
-def extract_city_subgrouping_urls(html: str, page_url: str) -> list[str]:
+def extract_city_subgrouping_urls(html: str, page_url: str, *, fallback: bool = True) -> list[str]:
     seen: set[str] = set()
     urls: list[str] = []
     for match in CITY_SUBGROUPING_PATTERN.finditer(html):
@@ -125,7 +125,7 @@ def extract_city_subgrouping_urls(html: str, page_url: str) -> list[str]:
         if url not in seen:
             seen.add(url)
             urls.append(url)
-    if not urls:
+    if not urls and fallback:
         urls = list(_STUBHUB_CITY_SUBPAGES)
     return urls
 

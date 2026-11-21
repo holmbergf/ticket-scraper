@@ -1,4 +1,4 @@
-"""ticket-ingest CLI: ``crawl`` and ``migrate-sqlite`` subcommands.
+"""ticket-ingest CLI: crawl one collection, manage collections, import SQLite.
 
 Warehouse publishing is a separate step:
 ``python -m ticket_ingest.publish_warehouse`` after ``dbt build``.
@@ -12,7 +12,10 @@ import logging
 import time
 from pathlib import Path
 
-from .alerts import EXPECTED_EVENT_COUNTS, evaluate_alerts, get_snapshot_diffs
+from dataclasses import replace
+
+from .alerts import evaluate_alerts, get_snapshot_diffs
+from .collections import list_collections, load_collection
 from .config import Settings
 from .http import BrowserFetchConfig
 from .jobs import SOURCES, CrawlOptions, SourceStats, run_crawl
@@ -30,22 +33,43 @@ def main(argv: list[str] | None = None) -> None:
         datefmt="%H:%M:%S",
     )
     settings = Settings.from_env()
+    overrides = {}
     if getattr(args, "data_dir", None):
-        settings = Settings(data_dir=Path(args.data_dir), raw_html_dir=Path(args.data_dir) / "raw_html")
+        overrides["data_dir"] = Path(args.data_dir)
+        overrides["raw_html_dir"] = Path(args.data_dir) / "raw_html"
+    if getattr(args, "collections_dir", None):
+        overrides["collections_dir"] = Path(args.collections_dir)
+    if overrides:
+        settings = replace(settings, **overrides)
     storage = get_storage(settings)
 
+    if args.command == "collections":
+        _run_collections_command(settings, args)
+        return
     if args.command == "migrate-sqlite":
         from .migrate import migrate_sqlite
 
-        counts = migrate_sqlite(Path(args.db_path), storage)
-        print(f"Migrated {counts} from {args.db_path} into {settings.data_dir}/raw")
+        counts = migrate_sqlite(Path(args.db_path), storage, args.collection)
+        print(f"Migrated {counts} from {args.db_path} into {settings.data_dir}/raw "
+              f"(collection {args.collection})")
         return
 
     _run_crawl_command(settings, storage, args)
 
 
+def _run_collections_command(settings, args) -> None:
+    if args.collections_command == "validate":
+        c = load_collection(args.collection, settings)
+        print(f"OK {c.slug}: {c.title} ({c.kind}, {c.status}) — "
+              f"{len(c.events)} declared events, sources {sorted(c.sources)}")
+        return
+    for c in list_collections(settings):
+        print(f"{c.slug:<45} {c.kind:<11} {c.status:<10} {c.title}")
+
+
 def _run_crawl_command(settings, storage, args) -> None:
-    selected = args.source or list(SOURCES)
+    collection = load_collection(args.collection, settings)
+    selected = args.source or list(collection.sources)
     options = CrawlOptions(
         max_events=args.max_events,
         timeout=args.timeout,
@@ -55,7 +79,7 @@ def _run_crawl_command(settings, storage, args) -> None:
         browser_config=BrowserFetchConfig(chrome_path=args.chrome_path, browser_timeout_s=args.browser_timeout),
     )
     wall_start = time.monotonic()
-    results = run_crawl(settings, storage, selected, options)
+    results = run_crawl(settings, storage, selected, options, collection)
     wall_elapsed = time.monotonic() - wall_start
 
     all_stats: list[SourceStats] = []
@@ -63,14 +87,15 @@ def _run_crawl_command(settings, storage, args) -> None:
     for source in selected:
         crawl_ts, stats = results.get(source, ("", SourceStats(source=source, error_message="crawl failed")))
         if crawl_ts and not stats.error_message:
-            diffs = get_snapshot_diffs(settings.data_dir, source, crawl_ts)
+            diffs = get_snapshot_diffs(settings.data_dir, source, crawl_ts,
+                                       collection_slug=collection.slug)
             stats.changed_events = len(diffs)
             source_diffs.append((source, diffs))
         all_stats.append(stats)
 
     alerts = evaluate_alerts(source_diffs)
     for stats in all_stats:
-        expected = EXPECTED_EVENT_COUNTS.get(stats.source, 0)
+        expected = collection.expected_events(stats.source)
         if expected and stats.events_discovered < expected * 0.5:
             alerts.append(f"[{stats.source}] Data quality: only {stats.events_discovered} events discovered (expected ~{expected})")
         if stats.error_message:
@@ -78,6 +103,7 @@ def _run_crawl_command(settings, storage, args) -> None:
     for stats in all_stats:
         stats.alerts = [a for a in alerts if a.startswith(f"[{stats.source}]")]
 
+    print(f"Collection: {collection.slug} — {collection.title}")
     _print_summary(all_stats, wall_elapsed, settings.data_dir)
     for alert in alerts:
         print(f"  ALERT: {alert}")
@@ -108,11 +134,14 @@ def _print_summary(all_stats, wall_elapsed, data_dir) -> None:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="ticket-ingest", description="Monitor FIFA World Cup 2026 ticket prices.")
+    parser = argparse.ArgumentParser(prog="ticket-ingest", description="Monitor ticket prices for tracked collections.")
     parser.add_argument("--data-dir", default=None, help="Data root (default: repo data/ or $DATA_DIR).")
+    parser.add_argument("--collections-dir", default=None, help="Collections root (default: repo collections/ or $COLLECTIONS_DIR).")
     sub = parser.add_subparsers(dest="command", required=True)
 
     crawl = sub.add_parser("crawl", help="Crawl ticket marketplaces and land raw Parquet.")
+    crawl.add_argument("--collection", default="fifa-world-cup-2026",
+                       help="Collection slug or TOML path (default: fifa-world-cup-2026).")
     crawl.add_argument("--source", action="append", choices=sorted(SOURCES),
                        help="Restrict to one source. Repeatable.")
     crawl.add_argument("--max-events", type=int, default=0,
@@ -129,7 +158,15 @@ def _build_parser() -> argparse.ArgumentParser:
 
     migrate = sub.add_parser("migrate-sqlite", help="Import a SQLite DB (events/market_snapshots/listings tables) into the raw zone.")
     migrate.add_argument("db_path", help="Path to the SQLite database.")
+    migrate.add_argument("--collection", default="fifa-world-cup-2026",
+                         help="Collection slug to stamp imported rows with.")
     migrate.add_argument("-v", "--verbose", action="store_true", default=False)
+
+    collections = sub.add_parser("collections", help="List or validate collection definitions.")
+    csub = collections.add_subparsers(dest="collections_command", required=True)
+    csub.add_parser("list", help="List configured collections.")
+    validate = csub.add_parser("validate", help="Validate one collection definition.")
+    validate.add_argument("collection", help="Collection slug or TOML path.")
     return parser
 
 

@@ -1,7 +1,8 @@
 {{ config(materialized='view') }}
 
--- Semantic: per-source current-market overview in dollars.
+-- Semantic: per-collection, per-source current-market overview in dollars.
 select
+    collection_slug,
     source,
     total_events,
     events_with_price,

@@ -1,0 +1,23 @@
+name: ingest/fifa-world-cup-2026
+
+# Manual caller for one collection. Copy this file per collection and
+# change the collection input (slug = collections/<slug>.toml).
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: "Single source to crawl (empty = all configured)"
+        type: choice
+        options: ["", fifacollect, gametime, stubhub, viagogo, vivid]
+        default: ""
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  ingest:
+    uses: ./.github/workflows/ingest-collection.yml
+    with:
+      collection: fifa-world-cup-2026
+      source: ${{ inputs.source }}

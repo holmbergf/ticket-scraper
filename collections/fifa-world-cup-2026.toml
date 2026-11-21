@@ -1,0 +1,50 @@
+# FIFA World Cup 2026 — 104 matches discovered from marketplace listing
+# pages. Canonical events are derived from each listing's match number
+# (event_key = "match-<n>"), so this file declares no [[events]].
+slug = "fifa-world-cup-2026"
+title = "FIFA World Cup 2026"
+kind = "tournament"
+status = "completed"
+description = "Resale prices for all 104 World Cup matches across five marketplaces."
+timezone = "UTC"
+icon = "⚽"
+accent_color = "#3aa76d"
+priority_participants = ["USA", "United States"]
+priority_stages = ["Final", "Semi-Final", "Quarter-Final", "Round of 16"]
+
+[sources.vivid]
+discovery_url = "https://www.vividseats.com/world-cup-soccer-tickets--sports-soccer/performer/944"
+page_key = "world-cup-performer"
+fetch_mode = "browser"
+expected_events = 80
+
+[sources.gametime]
+discovery_url = "https://gametime.co/2026-fifa-world-cup-tickets/performers/soccerworldcup"
+page_key = "world-cup-performer"
+expected_events = 80
+discovery_terms = ["world cup", "fifa"]
+
+[sources.stubhub]
+discovery_url = "https://www.stubhub.com/world-cup-tickets/grouping/45410"
+page_key = "world-cup-grouping"
+fetch_mode = "playwright"
+max_workers = 1
+expected_events = 80
+expand_subpages = true
+subpage_fallback = true
+subpage_interval_s = 10
+
+[sources.viagogo]
+discovery_url = "https://www.viagogo.com/Sports-Tickets/Soccer/Soccer-Tournament/World-Cup-Tickets"
+page_key = "world-cup-grouping"
+fetch_mode = "playwright"
+max_workers = 2
+expected_events = 80
+cross_source = "stubhub"
+event_url_template = "https://www.viagogo.com/Sports-Tickets/Soccer/Soccer-Tournament/World-Cup-Tickets/E-{event_id}"
+
+[sources.fifacollect]
+discovery_url = "https://api.prod.rock-palisade-352518.com/marketplace/rtts/filters?language=en-UK"
+page_key = "rtt-marketplace"
+fetch_mode = "http"
+expected_events = 90

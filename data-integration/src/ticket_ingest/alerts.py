@@ -19,16 +19,9 @@ ALERT_THRESHOLDS = {
     "cross_market_gap": 0.15,
 }
 
-EXPECTED_EVENT_COUNTS: dict[str, int] = {
-    "vivid": 80,
-    "gametime": 80,
-    "stubhub": 80,
-    "viagogo": 80,
-    "fifacollect": 90,
-}
-
-
-def get_snapshot_diffs(data_dir: Path, source: str, crawl_ts_utc: str, *, changed_only: bool = True) -> list[SnapshotDiff]:
+def get_snapshot_diffs(data_dir: Path, source: str, crawl_ts_utc: str, *,
+                       collection_slug: str = "fifa-world-cup-2026",
+                       changed_only: bool = True) -> list[SnapshotDiff]:
     """Diff one crawl against the previous crawl, read from raw Parquet."""
     import duckdb
 
@@ -39,8 +32,13 @@ def get_snapshot_diffs(data_dir: Path, source: str, crawl_ts_utc: str, *, change
         rows = con.execute(
             """
             WITH snaps AS (
-                SELECT * FROM read_parquet(?, hive_partitioning=true, union_by_name=true)
+                SELECT * FROM (
+                    SELECT * FROM read_parquet(?, hive_partitioning=true, union_by_name=true)
+                    UNION ALL BY NAME
+                    SELECT NULL::VARCHAR AS collection_slug WHERE FALSE
+                )
                 WHERE source = ?
+                  AND coalesce(collection_slug, 'fifa-world-cup-2026') = ?
             ),
             ranked AS (
                 SELECT *,
@@ -58,8 +56,13 @@ def get_snapshot_diffs(data_dir: Path, source: str, crawl_ts_utc: str, *, change
             ),
             events AS (
                 SELECT event_id_external, ANY_VALUE(event_name) AS event_name
-                FROM read_parquet(?, hive_partitioning=true, union_by_name=true)
-                WHERE source = ? GROUP BY 1
+                FROM (
+                    SELECT * FROM read_parquet(?, hive_partitioning=true, union_by_name=true)
+                    UNION ALL BY NAME
+                    SELECT NULL::VARCHAR AS collection_slug WHERE FALSE
+                )
+                WHERE source = ?
+                  AND coalesce(collection_slug, 'fifa-world-cup-2026') = ? GROUP BY 1
             )
             SELECT c.source, c.event_id_external, e.event_name, c.event_url, c.crawl_ts_utc,
                    p.crawl_ts_utc, c.lowest_price_cents, p.lowest_price_cents,
@@ -70,7 +73,8 @@ def get_snapshot_diffs(data_dir: Path, source: str, crawl_ts_utc: str, *, change
             LEFT JOIN events e USING (event_id_external)
             ORDER BY c.event_id_external
             """,
-            [snapshots_glob, source, crawl_ts_utc, crawl_ts_utc, events_glob, source],
+            [snapshots_glob, source, collection_slug, crawl_ts_utc, crawl_ts_utc,
+             events_glob, source, collection_slug],
         ).fetchall()
     except Exception as exc:  # no raw data yet (first crawl)
         log.warning("snapshot diffs unavailable for %s: %s", source, exc)

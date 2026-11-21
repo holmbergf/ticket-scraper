@@ -5,6 +5,10 @@ models cast 1:1 against them, so a parser/source schema change fails
 loudly at the bronze cast rather than drifting downstream.
 
 Conventions:
+- Every row carries ``collection_slug`` + ``event_key`` (canonical event
+  identity assigned by ``ticket_ingest.collections`` at land time). Files
+  written before collections existed lack both; bronze/silver coalesce
+  them to the FIFA World Cup 2026 defaults.
 - Prices are integer cents. Only dbt semantic models convert to dollars.
 - Timestamps land as ISO-8601 UTC strings; bronze casts them to TIMESTAMP.
 - No ``raw_snapshot_path`` column: raw HTML snapshots are local debugging
@@ -22,6 +26,8 @@ import pyarrow as pa
 from .models import Event, Listing, MarketSnapshot
 
 EVENTS_SCHEMA = pa.schema([
+    ("collection_slug", pa.string()),
+    ("event_key", pa.string()),
     ("source", pa.string()),
     ("event_id_external", pa.string()),
     ("event_url", pa.string()),
@@ -40,6 +46,8 @@ EVENTS_SCHEMA = pa.schema([
 ])
 
 MARKET_SNAPSHOTS_SCHEMA = pa.schema([
+    ("collection_slug", pa.string()),
+    ("event_key", pa.string()),
     ("source", pa.string()),
     ("event_id_external", pa.string()),
     ("crawl_ts_utc", pa.string()),
@@ -55,6 +63,8 @@ MARKET_SNAPSHOTS_SCHEMA = pa.schema([
 ])
 
 LISTINGS_SCHEMA = pa.schema([
+    ("collection_slug", pa.string()),
+    ("event_key", pa.string()),
     ("source", pa.string()),
     ("event_id_external", pa.string()),
     ("crawl_ts_utc", pa.string()),

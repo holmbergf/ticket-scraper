@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ticket-ingest"
-version = "0.1.0"
-description = "FIFA World Cup 2026 ticket-price ingestion: marketplace crawlers landing content-addressed Parquet in the repo"
+version = "0.2.0"
+description = "Generic ticket-price ingestion: collection-configured marketplace crawlers landing content-addressed Parquet in the repo"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

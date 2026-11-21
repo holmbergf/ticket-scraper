@@ -45,6 +45,7 @@ class WriteResult:
     rows: int = 0
     covered_crawl_ts: list[str] = field(default_factory=list)
     sources: list[str] = field(default_factory=list)
+    collections: list[str] = field(default_factory=list)
 
 
 class LocalStorage:
@@ -98,6 +99,9 @@ def write_dataset(storage: LocalStorage, df: pd.DataFrame, dataset: str, source:
     if "crawl_ts_utc" in df.columns:
         result.covered_crawl_ts = sorted(df["crawl_ts_utc"].astype(str).unique())
     result.sources = sorted(df["source"].astype(str).unique())
+    if "collection_slug" in df.columns:
+        result.collections = sorted(
+            c for c in df["collection_slug"].astype(str).unique() if c and c != "None")
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + content_hash(df)
     for partition, part in _partition_groups(df, dataset):
         # Hash without the import timestamp: identical data re-fetched later
@@ -125,6 +129,7 @@ def write_dataset(storage: LocalStorage, df: pd.DataFrame, dataset: str, source:
         "skipped_keys": result.skipped_keys,
         "covered_crawl_ts": result.covered_crawl_ts,
         "sources": result.sources,
+        "collections": result.collections,
         "content_hash": content_hash(df),
     }
     storage.put_bytes(f"_manifests/{dataset}/{run_id}.json", json.dumps(manifest, indent=2).encode())
@@ -151,17 +156,25 @@ class StateStore:
             stamps.update(m.get("covered_crawl_ts") or [])
         return sorted(stamps)
 
-    def event_ids_for_source(self, source: str) -> list[str]:
+    def event_ids_for_source(self, source: str, collection_slug: str | None = None) -> list[str]:
         """Known event ids for a source, from the raw events partition.
 
         Used for Viagogo cross-source expansion (event URLs are built from
-        StubHub ids) when StubHub was not crawled in the same run.
+        StubHub ids) when StubHub was not crawled in the same run. Filtered
+        to one collection when given; files predating collections count as
+        the FIFA World Cup collection.
         """
         keys = [k for k in self.storage.list_keys(f"raw/events/source={source}/") if k.endswith(".parquet")]
         ids: set[str] = set()
         for key in keys:
-            table = pq.read_table(io.BytesIO(self.storage.get_bytes(key)), columns=["event_id_external"])
-            ids.update(v for v in table.column("event_id_external").to_pylist() if v)
+            table = pq.read_table(io.BytesIO(self.storage.get_bytes(key)))
+            external = table.column("event_id_external").to_pylist()
+            if collection_slug is None or "collection_slug" not in table.column_names:
+                allowed = [True] * len(external) if collection_slug is None \
+                    else [collection_slug == "fifa-world-cup-2026"] * len(external)
+            else:
+                allowed = [c == collection_slug for c in table.column("collection_slug").to_pylist()]
+            ids.update(v for v, ok in zip(external, allowed) if v and ok)
         return sorted(ids)
 
 

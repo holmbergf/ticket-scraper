@@ -2,10 +2,12 @@
 
 ## Project
 
-ELT pipeline tracking FIFA World Cup 2026 resale ticket prices across
-Vivid Seats, Gametime, StubHub, Viagogo, and FIFA Collect. The git repo
-is the storage layer. Design: [docs/architecture.md](docs/architecture.md).
-Ingestion is manual (no schedule — the tournament has concluded).
+Generic ELT pipeline for resale ticket prices. Tracked tournaments,
+games, and multi-session events are **collections** declared in
+`collections/*.toml` (see `collections/README.md`); canonical identity is
+`(collection_slug, event_key)` end to end. The git repo is the storage
+layer. Design: [docs/architecture.md](docs/architecture.md). Ingestion is
+manual per collection (no schedules).
 
 ## Build & Run
 
@@ -14,7 +16,7 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -e "./data-integration[dev]" dbt-duckdb duckdb
 pip install -r dashboard/requirements.txt
 playwright install chromium
-ticket-ingest crawl                                   # land raw Parquet
+ticket-ingest crawl --collection fifa-world-cup-2026   # land raw Parquet
 cd dbt-transform && dbt build --target prod --profiles-dir . && cd ..
 python -m ticket_ingest.publish_warehouse             # serving exports
 streamlit run dashboard/streamlit_app.py              # localhost:8501
@@ -56,12 +58,20 @@ Parsers → raw Parquet (repo) → dbt bronze/silver/gold/semantic (DuckDB)
 Parsers return raw data. Ingestion lands it unchanged. dbt shapes it.
 Dashboard only reads published Parquet.
 
+## Adding a Collection
+
+Follow `collections/README.md`: copy a TOML, declare canonical events (or
+derive them), configure per-source discovery/event URLs, validate
+(`ticket-ingest collections validate <slug>`), crawl, rebuild + publish,
+and copy a caller workflow (`.github/workflows/ingest-<slug>.yml`).
+Dashboard pages are generated from the published catalog — no code.
+
 ## Adding a New Source
 
 1. Create `data-integration/src/ticket_ingest/parsers/<source>.py` — expose
    `discover_events()` and `parse_event_page()` returning `ParseResult`.
-2. Register in `SOURCE_CONFIGS` in `ticket_ingest/jobs.py` (fetch mode,
-   workers, expected count in `alerts.py`).
+2. Register the adapter in `SOURCE_ADAPTERS` in `ticket_ingest/jobs.py`
+   and the name in `KNOWN_SOURCES` in `ticket_ingest/collections.py`.
 3. Add fixtures in `data-integration/tests/fixtures/` and parser tests.
 4. Add the source to `accepted_values` in `dbt-transform/.../_schema.yml`
    and `SOURCE_COLORS` / `SOURCE_DISPLAY_NAMES` in the dashboard.
