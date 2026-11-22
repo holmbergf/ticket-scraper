@@ -56,7 +56,7 @@ jobs:
       - name: Install ingestion + dbt
         run: |
           pip install "./data-integration[dev]" dbt-duckdb duckdb
-          playwright install --with-deps chromium
+          playwright install --with-deps chrome chromium
           ticket-ingest collections validate "${{ inputs.collection }}"
       - name: Crawl (land raw Parquet)
         env:

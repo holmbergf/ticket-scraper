@@ -28,6 +28,13 @@ def test_fifa_config_covers_all_adapters():
     assert c.expected_events("fifacollect") == 90
 
 
+def test_stubhub_warmup_urls_are_configured():
+    c = load_collection("nfl-cowboys-at-seahawks-2026-12-07")
+    configs = build_source_configs(c)
+    assert configs["stubhub"]["warmup_urls"][0] == "https://www.stubhub.com/"
+    assert configs["gametime"]["event_wait_selector"]
+
+
 def test_resolver_assigns_canonical_event_and_stamps_rows():
     c = load_collection("nfl-cowboys-at-seahawks-2026-12-07")
     resolver = EventResolver(c)

@@ -6,7 +6,7 @@ WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY src ./src
 RUN pip install --no-cache-dir . \
-    && playwright install --with-deps chromium
+    && playwright install --with-deps chrome chromium
 
 ENTRYPOINT ["ticket-ingest"]
 CMD ["crawl", "--help"]

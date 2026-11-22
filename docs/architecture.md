@@ -87,12 +87,19 @@ driven:
 |---|---|
 | Vivid Seats | Headless Chrome (`--dump-dom`) |
 | Gametime | HTTP for static pages; Playwright + `event_wait_selector` where listings render client-side |
-| StubHub | Playwright (AWS WAF); optional sub-page expansion with sequential gaps + challenge backoff |
-| Viagogo | Playwright; often cross-built from StubHub ids |
+| StubHub | Playwright on installed Chrome; cold deep links hit a DataDome CAPTCHA wall, so sessions warm via home/performer pages first; optional sub-page expansion |
+| Viagogo | Playwright on installed Chrome; often cross-built from StubHub ids |
 | FIFA Collect | JSON API (`collect.fifa.com` RTT marketplace); FIFA collection only |
 
 Rate-limit rule: repeated crawls more often than ~60 s can trigger
-StubHub/Viagogo WAF IP blocks.
+StubHub/Viagogo WAF IP blocks. Verified block anatomy (Cowboys test):
+DataDome (`x-datadome: protected`, `rt='c'`) 403s Playwright's bundled
+Chromium even warm, and installed Chrome on a cold deep link; installed
+Chrome + a warmed home→performer session returns 200. Forcing static
+`Sec-Fetch-*` headers also retriggers the wall, so contexts let Chrome
+set them. If a network still gets a CAPTCHA wall, the supported routes
+are the official StubHub/Viagogo affiliate APIs (OAuth keys on request)
+or running that collection locally — not CAPTCHA solving.
 
 ## 4. Ingestion (`data-integration/`)
 

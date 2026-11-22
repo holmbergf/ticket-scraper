@@ -180,10 +180,28 @@ def _get_playwright_browser():
 
     from playwright.sync_api import sync_playwright
     pw = sync_playwright().start()
-    browser = pw.chromium.launch(
-        headless=True,
-        args=["--disable-blink-features=AutomationControlled"],
-    )
+    # DataDome scores Playwright's bundled Chromium materially worse than
+    # an installed Google Chrome build (verified on StubHub/Viagogo: the
+    # same session gets a CAPTCHA wall in bundled Chromium and a 200 in
+    # Chrome). Prefer Chrome when present; fall back for minimal images.
+    browser = None
+    channel = os.getenv("PLAYWRIGHT_CHANNEL", "chrome")
+    attempts = ([{"channel": channel}] if channel else []) + [{}]
+    last_exc: Exception | None = None
+    for kwargs in attempts:
+        try:
+            browser = pw.chromium.launch(
+                headless=True,
+                args=["--disable-blink-features=AutomationControlled"],
+                **kwargs,
+            )
+            log.debug("Playwright browser launched (channel=%s)", kwargs.get("channel", "bundled"))
+            break
+        except Exception as exc:  # Chrome not installed in this image
+            last_exc = exc
+    if browser is None:
+        pw.stop()
+        raise FetchError(f"Could not launch Playwright browser: {last_exc}")
     _pw_local.pw = pw
     _pw_local.browser = browser
     _pw_local.contexts = {}
@@ -204,18 +222,14 @@ def _get_playwright_context(url: str):
             contexts.pop(domain, None)
 
     browser = _get_playwright_browser()
+    # Do not force Sec-Fetch-* headers: Chrome sets them per navigation,
+    # and pinning cross-site values onto same-site warmup navigations is
+    # itself a DataDome signal (verified: StubHub event pages 403 with
+    # the pinned headers and 200 without, in the same warmed session).
     ctx = browser.new_context(
         user_agent=DEFAULT_USER_AGENT,
         viewport={"width": 1440, "height": 900},
         locale="en-US",
-        extra_http_headers={
-            "Accept-Language": "en-US,en;q=0.9",
-            "Sec-Fetch-Dest": "document",
-            "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-Site": "none",
-            "Sec-Fetch-User": "?1",
-            "Upgrade-Insecure-Requests": "1",
-        },
     )
     ctx.add_init_script(
         "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
@@ -253,6 +267,7 @@ def fetch_text_playwright(
     scroll: bool = False,
     min_interval: float | None = None,
     wait_selector: str | None = None,
+    warmup_urls: tuple[str, ...] = (),
 ) -> FetchResponse:
     from urllib.parse import urlparse
     domain = urlparse(url).netloc
@@ -272,6 +287,23 @@ def fetch_text_playwright(
     page = ctx.new_page()
     try:
         timeout_ms = int(timeout * 1000)
+        # Some WAFs (DataDome on StubHub) serve a CAPTCHA wall to a cold
+        # deep link but allow the same session after ordinary entry-point
+        # pages set first-party cookies. Warm this context once, in order.
+        warmed = getattr(_pw_local, "warmed", set())
+        for warm_url in warmup_urls:
+            marker = (id(ctx), warm_url)
+            if marker in warmed or warm_url == url:
+                continue
+            warmed.add(marker)
+            try:
+                log.debug("Warming Playwright session via %s", warm_url)
+                page.goto(warm_url, wait_until=wait_until, timeout=timeout_ms)
+                page.wait_for_timeout(2500)
+            except Exception as exc:
+                log.warning("Warmup fetch failed for %s: %s", warm_url, exc)
+        _pw_local.warmed = warmed
+
         response = page.goto(url, wait_until=wait_until, timeout=timeout_ms)
 
         # Wait for AWS WAF / DataDome challenges to resolve.
@@ -309,10 +341,17 @@ def fetch_text_playwright(
         html = page.content()
         status = response.status if response else 200
 
-        if status >= 400:
-            raise FetchError(f"HTTP error fetching {url}: {status}")
         if _looks_like_challenge_page(html):
             raise FetchError(f"Challenge page returned for {url}")
+        if status >= 400:
+            # A bot-wall device check can answer 401/403/429 first and then
+            # reload into the real page. The initial status alone should
+            # not discard content that has since rendered successfully.
+            if status in (401, 403, 429) and len(html) > _CHALLENGE_PAGE_MAX_BYTES:
+                log.warning("Initial HTTP %s for %s recovered into rendered content", status, url)
+                status = 200
+            else:
+                raise FetchError(f"HTTP error fetching {url}: {status}")
 
         final_url = page.url
         log.debug("Playwright OK %s (%d bytes)", url, len(html))
