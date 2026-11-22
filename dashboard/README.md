@@ -5,19 +5,18 @@ Dashboard over the semantic layer (`semantic_collections`,
 `semantic_price_trends`). It reads only the
 published Parquet exports (`data/data_warehouse/`) — never the raw zone.
 
-Navigation is generated from the published catalogs:
+The sidebar first selects the tracked collection (for example FIFA World
+Cup 2026 or Cowboys at Seahawks). The same four pages then render that
+collection:
 
-- **Home** — every collection with coverage, cheapest event, and links.
-- **Market / Deals / History** — shared analytics scoped to the sidebar's
-  analytics collection (trends, cross-source savings/drops, per-event
-  history, days-to-event curves, listing drill-down).
-- **One overview per collection** — an event card plus a clickable
-  all-events table with daily-best sparklines.
-- **One dedicated page per canonical event** — event card, price history,
-  and listings for exactly that event (e.g.
-  `event-nfl-cowboys-at-seahawks-2026-12-07--dallas-cowboys-at-seattle-seahawks`).
+- **Home** — event picker/card plus a clickable all-events table with
+  daily-best sparklines.
+- **Market** — scorecards, trend, and price by source/stage/city.
+- **Deals** — cross-source savings, biggest drops, and price distribution.
+- **History** — selected-event price history, days-to-event curves, and
+  clearly labelled individual listings.
 
-New collections and events appear automatically after the next publish;
+New collections appear in the sidebar switcher after the next publish;
 no dashboard code changes are needed.
 
 Design language: dark theme (`.streamlit/config.toml`), narrow 1180px

@@ -1,8 +1,8 @@
 """Ticket Scraper (Streamlit) — collections, markets, and event pages.
 
 Reads the published semantic Parquet exports via dashboard/warehouse.py.
-Navigation is generated from the published collection/event catalog:
-shared analytics pages plus one dedicated page per canonical event.
+The sidebar selects one tracked collection, then the earlier four-page
+structure — Home, Market, Deals, History — is scoped to that collection.
 
 Run with:  streamlit run dashboard/streamlit_app.py
 """
@@ -177,7 +177,7 @@ def get_ctx(collection_slug: str, *, filtered: bool = False) -> dict:
     for the analytics collection's filtered view; event detail pages use
     the unfiltered context for their own collection.
     """
-    use_filters = filtered and collection_slug == ANALYTICS_COLLECTION
+    use_filters = filtered and collection_slug == SELECTED_COLLECTION
     events = _event_prices(
         collection_slug, tuple(sorted(SELECTED_SOURCES)),
         STAGE_FILTER if use_filters else None,
@@ -395,10 +395,6 @@ def render_event_card(m, sp_all: pd.DataFrame, changes: pd.DataFrame,
                "including fees where the source indicates. Verify at the source before buying.")
 
 
-COLLECTION_PAGES: dict[str, object] = {}
-EVENT_PAGES: dict[str, object] = {}
-
-
 def _catalog_event(event_uid: str):
     rows = CATALOG[CATALOG["event_uid"] == event_uid] if len(CATALOG) else CATALOG
     return rows.iloc[0] if len(rows) else None
@@ -526,57 +522,8 @@ def render_event_listings(ctx: dict, m, *, key_suffix: str) -> None:
                 width="stretch")
 
 
-def page_home() -> None:
-    st.header("Collections")
-    st.caption("Each collection is an independently configured crawl with its own "
-               "overview and a dedicated page for every canonical event.")
-    if COLLECTIONS.empty:
-        st.info("No collections are published in this warehouse yet.")
-        return
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Collections", f"{len(COLLECTIONS)}")
-    c2.metric("Canonical events", f"{int(COLLECTIONS['event_count'].sum()) if 'event_count' in COLLECTIONS else len(CATALOG)}")
-    c3.metric("Priced events", f"{int(COLLECTIONS['priced_events'].sum()) if 'priced_events' in COLLECTIONS else 0}")
-    latest = COLLECTIONS["latest_crawl_ts_utc"].max() if "latest_crawl_ts_utc" in COLLECTIONS else None
-    c4.metric("Latest crawl", f"{pd.to_datetime(latest):%b %-d, %Y}" if pd.notna(latest) else "—")
-
-    for _, c in COLLECTIONS.sort_values("collection_slug").iterrows():
-        slug = str(c.collection_slug)
-        with st.container(border=True):
-            left, right = st.columns([3, 1])
-            with left:
-                st.markdown(f"### {c.icon or ''} {c.title}")
-                if c.description and not pd.isna(c.description):
-                    st.write(c.description)
-                st.caption(f"{c.kind} · {c.status} · {int(c.event_count or 0)} events · "
-                           f"{int(c.priced_events or 0)} priced · cheapest {usd(c.cheapest_price)}")
-            with right:
-                page = COLLECTION_PAGES.get(slug)
-                if page is not None:
-                    st.page_link(page, label="Open collection", icon="➡️")
-                ev = CATALOG[CATALOG["collection_slug"] == slug] if len(CATALOG) else CATALOG
-                if len(ev) == 1 and str(ev.iloc[0].event_uid) in EVENT_PAGES:
-                    st.page_link(EVENT_PAGES[str(ev.iloc[0].event_uid)],
-                                 label="Open event page", icon="🎟️")
-
-    st.subheader("All collections")
-    show_cols = [c for c in ("title", "kind", "status", "event_count", "priced_events",
-                             "cheapest_price", "first_event_start", "last_event_start",
-                             "latest_crawl_ts_utc") if c in COLLECTIONS.columns]
-    st.dataframe(
-        COLLECTIONS.sort_values("collection_slug")[show_cols],
-        hide_index=True, width="stretch",
-        column_config={
-            "title": st.column_config.TextColumn("Collection", width="large"),
-            "cheapest_price": st.column_config.NumberColumn("Cheapest event", format="$%,.0f"),
-            "first_event_start": st.column_config.TextColumn("First event"),
-            "last_event_start": st.column_config.TextColumn("Last event"),
-            "latest_crawl_ts_utc": st.column_config.DatetimeColumn("Latest crawl"),
-        })
-
-
 def games_table(priced: pd.DataFrame, changes: pd.DataFrame, spark: pd.DataFrame) -> str | None:
-    """All-events table with sparklines; tick a row to open its event page."""
+    """All-events table with sparklines; tick a row to load it above."""
     g = priced.merge(changes[["event_uid", "change_pct"]], on="event_uid", how="left") \
         if len(changes) else priced.assign(change_pct=None)
     g = g.merge(spark, on=["collection_slug", "event_uid"], how="left") if len(spark) else g.assign(trend=None)
@@ -604,13 +551,13 @@ def games_table(priced: pd.DataFrame, changes: pd.DataFrame, spark: pd.DataFrame
     return str(g.iloc[rows[0]]["event_uid"]) if rows else None
 
 
-def page_collection_overview(collection_slug: str) -> None:
+def page_home(collection_slug: str) -> None:
+    """Earlier Matches/Home design, scoped to the selected collection."""
     collection_row = COLLECTIONS[COLLECTIONS["collection_slug"] == collection_slug]
-    title = str(collection_row.iloc[0].title) if len(collection_row) else collection_slug
-    st.header(title)
+    st.header("Home")
     if len(collection_row) and collection_row.iloc[0].description and not pd.isna(collection_row.iloc[0].description):
         st.caption(str(collection_row.iloc[0].description))
-    ctx = get_ctx(collection_slug, filtered=(collection_slug == ANALYTICS_COLLECTION))
+    ctx = get_ctx(collection_slug, filtered=True)
     matches, priced = ctx["matches"], ctx["priced"]
     if matches.empty:
         st.info("No events in this collection under the current filters yet.")
@@ -626,7 +573,11 @@ def page_collection_overview(collection_slug: str) -> None:
                           how="left", suffixes=("", "_c")).sort_values("change_pct", na_position="last")
     labels = work["display_name"].fillna("Event").tolist()
     label_to_uid = dict(zip(labels, work["event_uid"].astype(str)))
+    uid_to_label = {uid: label for label, uid in label_to_uid.items()}
     picker_key = f"picker_{collection_slug}"
+    pending_uid = st.session_state.pop(f"_home_pending_{collection_slug}", None)
+    if pending_uid in uid_to_label:
+        st.session_state[picker_key] = uid_to_label[pending_uid]
     if st.session_state.get(picker_key) not in label_to_uid:
         st.session_state[picker_key] = labels[0]
     picked = st.selectbox("Event", labels, key=picker_key)
@@ -634,43 +585,19 @@ def page_collection_overview(collection_slug: str) -> None:
     if m is None:
         st.info("This event is configured but has no published row yet.")
         return
-    page = EVENT_PAGES.get(str(m.event_uid))
-    if page is not None:
-        st.page_link(page, label=f"Open the dedicated page for {short_title(str(m.display_name), 60)}", icon="🎟️")
     render_event_card(m, ctx["source_prices"], ctx["changes"], priced, ctx["sources"])
 
     st.subheader("All events")
-    st.caption("Tick a row's checkbox to open that event's page. Trend = daily best price across sources.")
+    st.caption("Tick a row's checkbox to load that event above. Trend = daily best price across sources.")
     picked_uid = games_table(work if len(work) else matches, ctx["changes"], ctx["sparklines"]) if len(priced) else None
-    if picked_uid and picked_uid in EVENT_PAGES:
-        st.switch_page(EVENT_PAGES[picked_uid])
-
-
-def page_event_detail(event_uid: str) -> None:
-    cat = _catalog_event(event_uid)
-    if cat is None:
-        st.error("This event is not in the published catalog.")
-        return
-    ctx = get_ctx(str(cat.collection_slug), filtered=False)
-    m = _event_row(ctx, event_uid)
-    if m is None:
-        st.error("This event could not be loaded.")
-        return
-    st.header(str(m.display_name))
-    coll = COLLECTION_TITLES.get(str(m.collection_slug), str(m.collection_slug))
-    st.caption(f"{coll} · {m.stage or 'Event'} · {m.city or '—'}")
-    if not bool(cat.get("has_warehouse_data", True)):
-        st.info("Configured, but not crawled yet — prices and listings will appear after its first crawl.")
-    render_event_card(m, ctx["source_prices"], ctx["changes"], ctx["priced"], ctx["sources"])
-    st.subheader("Price history")
-    render_event_history(ctx, m, key_suffix=f"event_{event_uid}")
-    render_event_listings(ctx, m, key_suffix=f"event_{event_uid}")
+    if picked_uid and picked_uid != str(m.event_uid):
+        st.session_state[f"_home_pending_{collection_slug}"] = picked_uid
+        st.rerun()
 
 
 def page_market() -> None:
-    ctx = get_ctx(ANALYTICS_COLLECTION, filtered=True)
-    title = COLLECTION_TITLES.get(ANALYTICS_COLLECTION, ANALYTICS_COLLECTION)
-    st.header(f"Market — {title}")
+    ctx = get_ctx(SELECTED_COLLECTION, filtered=True)
+    st.header("Market")
     priced, trends = ctx["priced"], ctx["market_trends"]
     if priced.empty:
         st.info("No priced events in this collection under the current filters.")
@@ -711,7 +638,7 @@ def page_market() -> None:
         st.altair_chart((med + avg + lo).properties(height=280).interactive(), width="stretch")
 
     st.subheader("Price by source")
-    overview = wh.source_overview(ANALYTICS_COLLECTION, ctx["sources"])
+    overview = wh.source_overview(SELECTED_COLLECTION, ctx["sources"])
     if len(overview):
         chart = (alt.Chart(overview.assign(name=overview["source"].map(
                     lambda s: SOURCE_DISPLAY_NAMES.get(s, s))))
@@ -727,6 +654,8 @@ def page_market() -> None:
                                   alt.Tooltip("events_with_price:Q", title="Events priced")])
                  .properties(height=250))
         st.altair_chart(chart, width="stretch")
+        inventory_max = overview["total_inventory"].max()
+        inventory_max = float(inventory_max) if pd.notna(inventory_max) and inventory_max > 0 else 1.0
         st.dataframe(
             overview[["source", "events_with_price", "total_events", "min_price",
                       "median_price", "avg_price", "max_price", "total_inventory"]],
@@ -738,8 +667,7 @@ def page_market() -> None:
                 "avg_price": st.column_config.NumberColumn("Average", format="$%,.0f"),
                 "max_price": st.column_config.NumberColumn("Most expensive", format="$%,.0f"),
                 "total_inventory": st.column_config.ProgressColumn(
-                    "Listings", min_value=0,
-                    max_value=float(overview["total_inventory"].max() or 1), format="%d"),
+                    "Listings", min_value=0, max_value=inventory_max, format="%d"),
             })
 
     if priced["stage"].notna().any():
@@ -784,13 +712,12 @@ def page_market() -> None:
                                   center={"lat": float(mdf["lat"].mean()), "lon": float(mdf["lon"].mean())},
                                   **map_kwargs)
                 fig.update_layout(height=460, margin=dict(t=10, b=10, l=0, r=0))
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
 
 
 def page_deals() -> None:
-    ctx = get_ctx(ANALYTICS_COLLECTION, filtered=True)
-    title = COLLECTION_TITLES.get(ANALYTICS_COLLECTION, ANALYTICS_COLLECTION)
-    st.header(f"Deals — {title}")
+    ctx = get_ctx(SELECTED_COLLECTION, filtered=True)
+    st.header("Deals")
     st.caption("Savings compare the cheapest and most expensive source for the same event "
                "at the latest crawl. Drops compare the daily best price, first crawl vs latest.")
     priced, changes = ctx["priced"], ctx["changes"]
@@ -884,9 +811,8 @@ def page_deals() -> None:
 
 
 def page_history() -> None:
-    ctx = get_ctx(ANALYTICS_COLLECTION, filtered=True)
-    title = COLLECTION_TITLES.get(ANALYTICS_COLLECTION, ANALYTICS_COLLECTION)
-    st.header(f"History — {title}")
+    ctx = get_ctx(SELECTED_COLLECTION, filtered=True)
+    st.header("History")
     matches = ctx["matches"]
     if matches.empty:
         st.info("No events in this collection under the current filters.")
@@ -897,9 +823,6 @@ def page_history() -> None:
     if m is None:
         st.info("This event could not be loaded.")
         return
-    page = EVENT_PAGES.get(str(m.event_uid))
-    if page is not None:
-        st.page_link(page, label=f"Open the dedicated page for {short_title(str(m.display_name), 60)}", icon="🎟️")
     render_event_history(ctx, m, key_suffix="history")
 
     st.subheader("Days to event vs price")
@@ -937,100 +860,71 @@ def page_history() -> None:
     render_event_listings(ctx, m, key_suffix="history")
 
 
-def _make_collection_page(slug: str):
-    def run(_slug=slug):
-        page_collection_overview(_slug)
-    run.__name__ = f"collection_{slug.replace('-', '_')}"
-    return run
-
-
-def _make_event_page(event_uid: str):
-    def run(_uid=event_uid):
-        page_event_detail(_uid)
-    run.__name__ = "event_" + "".join(c if c.isalnum() else "_" for c in event_uid)
-    return run
-
-
-# ── Shell: title, navigation, sidebar filters, dispatch ──────────────────
-st.title("Ticket Scraper")
-catalog_dates = pd.to_datetime(CATALOG["event_start_local"], errors="coerce") if len(CATALOG) else pd.Series(dtype="datetime64[ns]")
-st.caption(
-    f"{len(COLLECTIONS)} collections · {len(CATALOG)} canonical events · "
-    "published semantic Parquet warehouse. Resale prices for your own "
-    "decision — verify at the source before buying."
-)
-
-home_page = st.Page(page_home, title="Home", url_path="home", default=True)
-market_page_obj = st.Page(page_market, title="Market", url_path="market")
-deals_page_obj = st.Page(page_deals, title="Deals", url_path="deals")
-history_page_obj = st.Page(page_history, title="History", url_path="history")
-sections: dict[str, list] = {
-    "Ticket Scraper": [home_page, market_page_obj, deals_page_obj, history_page_obj]
-}
-_nav_order = COLLECTIONS.assign(
-    _active=(COLLECTIONS["status"] != "active").astype(int)
-).sort_values(["_active", "collection_slug"]) if len(COLLECTIONS) else COLLECTIONS
-for _, c in _nav_order.iterrows():
-    slug = str(c.collection_slug)
-    overview = st.Page(_make_collection_page(slug), title="Overview",
-                       url_path=f"collection-{slug}")
-    COLLECTION_PAGES[slug] = overview
-    pages = [overview]
-    events = CATALOG[CATALOG["collection_slug"] == slug] if len(CATALOG) else CATALOG
-    if len(events):
-        events = events.assign(
-            _start=pd.to_datetime(events["event_start_local"], errors="coerce")
-        ).sort_values(["_start", "display_name"], na_position="last")
-        for _, ev in events.iterrows():
-            uid = str(ev.event_uid)
-            p = st.Page(_make_event_page(uid),
-                        title=short_title(str(ev.display_name)),
-                        url_path=f"event-{slug}--{ev.event_key}")
-            EVENT_PAGES[uid] = p
-            pages.append(p)
-    sections[str(c.title)] = pages
-
-nav = st.navigation(sections)
-
-sources_all = wh.sources()
-# Default shared analytics to an active collection when there is one.
+# ── Shell: tracked collection + earlier four-page structure ───────────────
 _ordered_collections = (
     COLLECTIONS.assign(_active=(COLLECTIONS["status"] != "active").astype(int))
     .sort_values(["_active", "collection_slug"])["collection_slug"].astype(str).tolist()
     if len(COLLECTIONS) else []
 )
-ANALYTICS_COLLECTION = st.sidebar.selectbox(
-    "Analytics collection", _ordered_collections,
-    format_func=lambda s: COLLECTION_TITLES.get(s, s),
-    help="Collection used by the shared Market, Deals, and History pages. "
-         "Collection and event pages always use their own collection.")
+if not _ordered_collections:
+    st.error("No collections are published in this warehouse yet.")
+    st.stop()
+
+# Flip between tracked tournaments/games/events here; the four pages below
+# always render the selected collection (the elt-pipeline sport switch).
+SELECTED_COLLECTION = st.sidebar.radio(
+    "Tracking", _ordered_collections,
+    format_func=lambda s: COLLECTION_TITLES.get(s, s))
+PAGE = st.sidebar.radio("Page", ["Home", "Market", "Deals", "History"])
+st.sidebar.markdown("---")
+
+_collection_row = COLLECTIONS[COLLECTIONS["collection_slug"] == SELECTED_COLLECTION]
+_collection_icon = str(_collection_row.iloc[0].icon or "") if len(_collection_row) else ""
+_collection_title = COLLECTION_TITLES.get(SELECTED_COLLECTION, SELECTED_COLLECTION)
+st.title(f"{_collection_icon} {_collection_title}".strip())
+_selected_trends = _market_trends(SELECTED_COLLECTION, tuple(wh.sources(SELECTED_COLLECTION)), VERSION)
+_first = f"{pd.to_datetime(_selected_trends.iloc[0]['crawl_date']):%b %-d, %Y}" if len(_selected_trends) else "—"
+_last = f"{pd.to_datetime(_selected_trends.iloc[-1]['crawl_date']):%b %-d, %Y}" if len(_selected_trends) else "—"
+st.caption(
+    f"Data: resale marketplaces via the ticket-scraper semantic layer, crawled "
+    f"{_first} → {_last} ({len(_selected_trends)} crawl days). Resale prices for "
+    "your own decision — verify at the source before buying."
+)
+
+sources_all = wh.sources(SELECTED_COLLECTION) or wh.sources()
 st.sidebar.markdown("### Filters")
 SELECTED_SOURCES = st.sidebar.multiselect(
     "Ticket sources", sources_all, default=sources_all,
     format_func=lambda s: SOURCE_DISPLAY_NAMES.get(s, s),
     help="Which marketplace(s) to include — best prices recompute over the selected sources.")
-_analytics_events = _event_prices(
-    ANALYTICS_COLLECTION, tuple(sorted(SELECTED_SOURCES or sources_all)), None, None, None, VERSION)
-stage_options = ["All Stages"] + stage_order(_analytics_events)
+_selected_events = _event_prices(
+    SELECTED_COLLECTION, tuple(sorted(SELECTED_SOURCES or sources_all)), None, None, None, VERSION)
+stage_options = ["All Stages"] + stage_order(_selected_events)
 selected_stage = st.sidebar.selectbox("Stage / session", stage_options)
 STAGE_FILTER = None if selected_stage == "All Stages" else selected_stage
 selected_city = st.sidebar.selectbox(
-    "Host city", ["All Cities"] + sorted(c for c in _analytics_events["city"].dropna().unique() if c))
+    "Host city", ["All Cities"] + sorted(c for c in _selected_events["city"].dropna().unique() if c))
 CITY_FILTER = None if selected_city == "All Cities" else selected_city
 _participants = sorted({
     str(v) for col in ("participant_1", "participant_2", "team_1", "team_2")
-    if col in _analytics_events.columns
-    for v in _analytics_events[col].dropna().unique() if v and v != "TBD"})
+    if col in _selected_events.columns
+    for v in _selected_events[col].dropna().unique() if v and v != "TBD"})
 selected_participant = st.sidebar.selectbox("Participant / team", ["All Participants"] + _participants)
 PARTICIPANT_FILTER = None if selected_participant == "All Participants" else selected_participant
 st.sidebar.markdown("---")
 st.sidebar.caption(f"Warehouse: published Parquet in `{wh.warehouse_dir().name}/`")
+st.sidebar.caption(f"Collection: `{SELECTED_COLLECTION}` · crawl days: {len(_selected_trends)}")
 
 if not SELECTED_SOURCES:
     st.info("Select at least one ticket source in the sidebar.")
     st.stop()
 
-nav.run()
+{
+    "Home": lambda: page_home(SELECTED_COLLECTION),
+    "Market": page_market,
+    "Deals": page_deals,
+    "History": page_history,
+}[PAGE]()
 
 st.markdown("---")
 st.caption("Prices are the lowest available listing per event from each source, "

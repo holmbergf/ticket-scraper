@@ -2,8 +2,7 @@
 
 End-to-end architecture of ticket-scraper: how resale ticket prices for
 any tracked collection — a tournament, a single game, or a multi-session
-event — move from marketplaces to a dashboard with one generated page per
-canonical event. The git repository is the storage layer. For a quick
+event — move from marketplaces to a collection-scoped dashboard. The git repository is the storage layer. For a quick
 start see the [README](../README.md); for adding a collection see
 [`collections/README.md`](../collections/README.md).
 
@@ -199,10 +198,10 @@ its first crawl. The Parquet export is the serving contract.
 
 Streamlit app reading only published exports via `dashboard/warehouse.py`
 (DuckDB over Parquet; `WAREHOUSE_DIR` / bundled layout / repo layout).
-Navigation is generated from the published catalogs: shared
-Home/Market/Deals/History analytics (scoped by the sidebar collection
-selector), one overview per collection, and one dedicated page per
-canonical event (`event-<collection>--<event_key>`). Source-subset views
+The sidebar selects the tracked collection first; the four pages
+(Home, Market, Deals, History) then render that collection. Within a
+collection, canonical events are selected on Home/History rather than
+given separate navigation pages. Source-subset views
 recompute at read time. The exports are committed, so the app needs no
 credentials. For Streamlit Community Cloud, `export_standalone.sh`
 bundles the app + the serving Parquet snapshot into a standalone repo
