@@ -190,7 +190,9 @@ def publish(db_path: Path, warehouse_dir: Path | None = None,
             # ORDER BY ALL: deterministic bytes across rebuilds, so an
             # ingest run that changed nothing produces a git no-op for the
             # committed serving files instead of Parquet byte churn.
-            arrow = con.execute(f'SELECT * FROM "{model}" ORDER BY ALL').fetch_arrow_table()
+            rel = con.execute(f'SELECT * FROM "{model}" ORDER BY ALL')
+            # DuckDB renamed fetch_arrow_table() to to_arrow_table().
+            arrow = rel.to_arrow_table() if hasattr(rel, "to_arrow_table") else rel.fetch_arrow_table()
             # All-null columns arrive with a null type; cast to string so the
             # published schema stays stable for readers.
             arrow = arrow.cast(pa.schema([
