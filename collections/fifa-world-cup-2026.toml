@@ -28,6 +28,7 @@ discovery_terms = ["world cup", "fifa"]
 discovery_url = "https://www.stubhub.com/world-cup-tickets/grouping/45410"
 page_key = "world-cup-grouping"
 fetch_mode = "playwright"
+warmup_urls = ["https://www.stubhub.com/"]
 max_workers = 1
 expected_events = 80
 expand_subpages = true

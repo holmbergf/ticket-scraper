@@ -15,7 +15,7 @@ manual per collection (no schedules).
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e "./data-integration[dev]" dbt-duckdb duckdb
 pip install -r dashboard/requirements.txt
-playwright install chromium
+playwright install chrome chromium
 ticket-ingest crawl --collection fifa-world-cup-2026   # land raw Parquet
 cd dbt-transform && dbt build --target prod --profiles-dir . && cd ..
 python -m ticket_ingest.publish_warehouse             # serving exports

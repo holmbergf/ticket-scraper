@@ -97,7 +97,7 @@ Prerequisites: Python 3.11+, Google Chrome (Vivid Seats browser fallback).
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e "./data-integration[dev]" dbt-duckdb duckdb
 pip install -r dashboard/requirements.txt
-playwright install chromium
+playwright install chrome chromium
 cp .env.example .env   # optional path overrides only; no secrets exist
 ```
 

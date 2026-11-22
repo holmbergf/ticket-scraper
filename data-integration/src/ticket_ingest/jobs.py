@@ -97,6 +97,7 @@ def build_source_configs(collection: CollectionConfig) -> dict[str, dict]:
             cfg["fetch_mode"] = sc.fetch_mode
         cfg["event_scroll"] = sc.event_scroll
         cfg["event_wait_selector"] = sc.event_wait_selector
+        cfg["warmup_urls"] = sc.warmup_urls
         if sc.max_workers:
             cfg["max_workers"] = sc.max_workers
         if name == "gametime":
@@ -255,8 +256,8 @@ def _crawl_source(source, storage, html_store, state, fetch_fn, options, known_i
 
     source_fetch_fn, source_discovery_fn = fetch_fn, fetch_fn
     if "fetch_mode" in config:
-        source_discovery_fn = _build_fetch_fn(config["fetch_mode"], options.timeout, options.browser_config, scroll=True)
-        source_fetch_fn = _build_fetch_fn(config["fetch_mode"], options.timeout, options.browser_config, scroll=bool(config.get("event_scroll")), wait_selector=config.get("event_wait_selector"))
+        source_discovery_fn = _build_fetch_fn(config["fetch_mode"], options.timeout, options.browser_config, scroll=True, warmup_urls=config.get("warmup_urls", ()))
+        source_fetch_fn = _build_fetch_fn(config["fetch_mode"], options.timeout, options.browser_config, scroll=bool(config.get("event_scroll")), wait_selector=config.get("event_wait_selector"), warmup_urls=config.get("warmup_urls", ()))
 
     source_workers = config.get("max_workers", options.workers)
     if mode == "event_urls":
@@ -462,13 +463,13 @@ def _prioritize_events(events: list[Event], collection: CollectionConfig) -> lis
     return sorted(events, key=priority_key)
 
 
-def _build_fetch_fn(fetch_mode: str, timeout: float, browser_config: BrowserFetchConfig, scroll: bool = False, min_interval: float | None = None, wait_selector: str | None = None):
+def _build_fetch_fn(fetch_mode: str, timeout: float, browser_config: BrowserFetchConfig, scroll: bool = False, min_interval: float | None = None, wait_selector: str | None = None, warmup_urls: tuple[str, ...] = ()):
     if fetch_mode == "browser":
         base_fn = lambda url: fetch_text_browser(url, timeout=timeout, config=browser_config)  # noqa: E731
     elif fetch_mode == "http":
         base_fn = lambda url: fetch_text(url, timeout=timeout)  # noqa: E731
     elif fetch_mode == "playwright":
-        base_fn = lambda url: fetch_text_playwright(url, timeout=timeout, scroll=scroll, min_interval=min_interval, wait_selector=wait_selector)  # noqa: E731
+        base_fn = lambda url: fetch_text_playwright(url, timeout=timeout, scroll=scroll, min_interval=min_interval, wait_selector=wait_selector, warmup_urls=warmup_urls)  # noqa: E731
     else:
         base_fn = lambda url: fetch_auto(url, timeout=timeout, config=browser_config)  # noqa: E731
 

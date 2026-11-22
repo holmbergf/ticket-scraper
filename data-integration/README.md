@@ -26,7 +26,7 @@ See the repo [README](../README.md) and
 
 ```bash
 pip install -e "./data-integration[dev]"
-playwright install chromium
+playwright install chrome chromium
 ticket-ingest collections list
 ticket-ingest crawl --collection nfl-cowboys-at-seahawks-2026-12-07
 ticket-ingest crawl --collection fifa-world-cup-2026 --source gametime

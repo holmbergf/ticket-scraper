@@ -55,6 +55,12 @@ page_key = "cowboys-seahawks"
 fetch_mode = "playwright"
 max_workers = 1
 expected_events = 1
+# DataDome walls cold deep links; entering via home + performer first
+# establishes the first-party session the event page then accepts.
+warmup_urls = [
+  "https://www.stubhub.com/",
+  "https://www.stubhub.com/dallas-cowboys-tickets/performer/6047",
+]
 
 [[sources.stubhub.event_urls]]
 event_key = "dallas-cowboys-at-seattle-seahawks"

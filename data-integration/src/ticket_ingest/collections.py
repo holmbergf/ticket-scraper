@@ -67,6 +67,7 @@ class CollectionSource:
     fetch_mode: str | None = None
     event_scroll: bool = False
     event_wait_selector: str | None = None
+    warmup_urls: tuple[str, ...] = ()
     max_workers: int | None = None
     expected_events: int = 0
     expand_subpages: bool = False
@@ -182,6 +183,7 @@ def _parse_collection(raw: dict, path: Path) -> CollectionConfig:
             fetch_mode=_opt_str(cfg, "fetch_mode"),
             event_scroll=bool(cfg.get("event_scroll", False)),
             event_wait_selector=_opt_str(cfg, "event_wait_selector"),
+            warmup_urls=tuple(str(v) for v in cfg.get("warmup_urls", [])),
             max_workers=int(cfg["max_workers"]) if cfg.get("max_workers") is not None else None,
             expected_events=int(cfg.get("expected_events") or 0),
             expand_subpages=bool(cfg.get("expand_subpages", False)),

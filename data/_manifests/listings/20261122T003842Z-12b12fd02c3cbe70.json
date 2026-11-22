@@ -1,0 +1,21 @@
+{
+  "run_id": "20261122T003842Z-12b12fd02c3cbe70",
+  "dataset": "listings",
+  "source": "nfl-cowboys-at-seahawks-2026-12-07:viagogo",
+  "written_at": "2026-11-22T00:38:42.289511+00:00",
+  "rows": 10,
+  "keys": [
+    "raw/listings/crawl_date=2026-11-22/part-76690e0b5128b7cc.parquet"
+  ],
+  "skipped_keys": [],
+  "covered_crawl_ts": [
+    "2026-11-22T00:38:35Z"
+  ],
+  "sources": [
+    "viagogo"
+  ],
+  "collections": [
+    "nfl-cowboys-at-seahawks-2026-12-07"
+  ],
+  "content_hash": "12b12fd02c3cbe70"
+}

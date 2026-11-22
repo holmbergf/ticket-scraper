@@ -21,6 +21,10 @@ its own crawl runs, workflow, and dashboard section: a tournament
      declared event pages directly (best for one-off games).
    - `mode = "cross_source"` + `event_url_template` — build event URLs
      from another source's ids (Viagogo from StubHub).
+   Optional per-source fetch controls: `fetch_mode`, `event_scroll`,
+   `event_wait_selector` (wait for client-rendered listings), and
+   `warmup_urls` (entry pages visited once per session before event
+   pages — required where a WAF walls cold deep links, e.g. StubHub).
 4. Validate and crawl:
    `ticket-ingest collections validate <slug>` then
    `ticket-ingest crawl --collection <slug>`.
