@@ -93,7 +93,7 @@ def _filter(values, col: str) -> tuple[str, list]:
 
 
 def collections() -> pd.DataFrame:
-    """Published collection registry (drives dashboard page generation)."""
+    """Published collection registry (drives the dashboard collection switcher)."""
     try:
         return load("collections")
     except FileNotFoundError:
@@ -235,7 +235,7 @@ def source_overview(collection: str | None = None, sources=None) -> pd.DataFrame
             "source": source, "total_events": len(g), "events_with_price": len(p),
             "min_price": p.min() if len(p) else None, "median_price": p.median() if len(p) else None,
             "avg_price": round(p.mean(), 2) if len(p) else None, "max_price": p.max() if len(p) else None,
-            "total_inventory": g["inventory_count"].sum(min_count=1),
+            "total_inventory": float(g["inventory_count"].fillna(0).sum()),
             "last_crawl_ts_utc": g["crawl_ts_utc"].max(),
         })
     if not rows:

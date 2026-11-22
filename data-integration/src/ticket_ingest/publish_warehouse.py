@@ -67,7 +67,7 @@ def build_catalog_frames(
     dim: pd.DataFrame,
     prices: pd.DataFrame,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Collection + canonical-event catalogs for dashboard page generation.
+    """Collection + canonical-event catalogs for dashboard navigation.
 
     Config-declared events appear even before their first crawl; warehouse
     dimension rows win where both exist.
@@ -203,7 +203,7 @@ def publish(db_path: Path, warehouse_dir: Path | None = None,
             counts[table] = arrow.num_rows
             log.info("published %s/%s: %d rows", layer, table, arrow.num_rows)
 
-        # Catalog tables drive dashboard page generation. They are built
+        # Catalog tables drive the dashboard collection switcher. They are built
         # from the same DuckDB build plus collection TOML files, so a
         # configured collection/event appears even before its first crawl.
         dim = con.execute('SELECT * FROM "dim_tickets_events"').df()

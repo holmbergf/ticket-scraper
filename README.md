@@ -9,7 +9,8 @@ Cup 2026 (104 matches) and Cowboys at Seahawks, Dec 7 2026 (one game).
 
 The pipeline lands partitioned Parquet **in this repository**, models it
 with dbt, and serves a Streamlit dashboard from the published semantic
-layer — one generated page per canonical event. Full design:
+layer. The dashboard flips between collections, each with the same
+Home / Market / Deals / History views. Full design:
 [docs/architecture.md](docs/architecture.md).
 
 Ingestion runs on demand per collection (GitHub Actions
@@ -47,11 +48,10 @@ FIFA Collect ┘                          │
   silver normalization + conformed event dim keyed by
   `(collection_slug, event_key)`, gold per-collection benchmarks, and a
   semantic layer in dollars. Publishing also emits collection/event
-  catalogs that generate the dashboard's pages.
+  catalogs behind the dashboard collection switcher.
 - **Dashboard** ([`dashboard/`](dashboard/)): Streamlit app over the
-  semantic exports — a collections home, shared Market/Deals/History
-  analytics per collection, a collection overview, and one dedicated
-  page per canonical event. Exports standalone for Streamlit Cloud via
+  semantic exports — pick a tracked collection in the sidebar, then use
+  its Home, Market, Deals, and History pages. Exports standalone via
   `dashboard/export_standalone.sh`.
 
 ## Repository structure
