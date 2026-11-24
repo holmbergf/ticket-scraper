@@ -1,10 +1,6 @@
 # ticket-scraper
 
-**[Open the live dashboard](https://ticket-scraper-dashboard-acwhbjgnk3u4opik4qsm8z.streamlit.app/)**
-
-[![CI data-integration](https://github.com/holmbergf/ticket-scraper/actions/workflows/data-integration.yml/badge.svg)](https://github.com/holmbergf/ticket-scraper/actions/workflows/data-integration.yml) [![CI dbt](https://github.com/holmbergf/ticket-scraper/actions/workflows/dbt.yml/badge.svg)](https://github.com/holmbergf/ticket-scraper/actions/workflows/dbt.yml) [![CI dashboard](https://github.com/holmbergf/ticket-scraper/actions/workflows/dashboard.yml/badge.svg)](https://github.com/holmbergf/ticket-scraper/actions/workflows/dashboard.yml)
-
-![Ticket Scraper dashboard](docs/assets/dashboard.png)
+**Live dashboard:** [ticket-scraper-dashboard-acwhbjgnk3u4opik4qsm8z.streamlit.app](https://ticket-scraper-dashboard-acwhbjgnk3u4opik4qsm8z.streamlit.app/)
 
 Generic ELT pipeline for resale ticket prices. A tracked tournament,
 single game, or multi-session event is a **collection** declared in

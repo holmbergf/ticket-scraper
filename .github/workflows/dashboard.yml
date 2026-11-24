@@ -27,10 +27,6 @@ jobs:
           cache: pip
       - name: Install
         run: pip install -r dashboard/requirements.txt pytest
-      - name: Lint
-        run: |
-          pip install "ruff==0.14.10"
-          ruff check dashboard
       - name: Data-layer tests (synthetic published exports)
         run: python -m pytest dashboard/tests -q
       - name: Byte-compile

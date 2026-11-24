@@ -1,5 +1,0 @@
-blank_issues_enabled: true
-contact_links:
-  - name: Live dashboard
-    url: https://ticket-scraper-dashboard-acwhbjgnk3u4opik4qsm8z.streamlit.app/
-    about: View currently tracked collections and prices

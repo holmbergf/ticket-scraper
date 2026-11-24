@@ -1,4 +1,0 @@
-*.parquet binary
-data/** linguist-generated
-data-integration/tests/fixtures/** linguist-generated
-dbt-transform/tests/fixtures/** linguist-generated
