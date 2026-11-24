@@ -27,6 +27,10 @@ jobs:
       - name: Check out ticket-scraper (source of truth)
         uses: actions/checkout@v4
         with:
+          # When chained after ingest, the ingest job has just pushed a
+          # crawl commit; sync must export that new tip, not the SHA that
+          # started the workflow run.
+          ref: main
           persist-credentials: false
       - name: Check out standalone dashboard repo
         uses: actions/checkout@v4
