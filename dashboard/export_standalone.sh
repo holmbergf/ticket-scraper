@@ -10,6 +10,7 @@ DEST="${1:?usage: export_standalone.sh <destination-dir>}"
 rm -rf "$DEST/data_warehouse"
 mkdir -p "$DEST/.streamlit" "$DEST/data_warehouse/semantic" "$DEST/data_warehouse/gold" "$DEST/data_warehouse/silver"
 cp dashboard/streamlit_app.py dashboard/warehouse.py dashboard/requirements.txt "$DEST/"
+cp LICENSE DATA.md "$DEST/"
 rm -f "$DEST/data.py"  # retired module name from earlier exports
 cp dashboard/.streamlit/secrets.toml.example dashboard/.streamlit/config.toml "$DEST/.streamlit/"
 cp data/data_warehouse/semantic/*.parquet "$DEST/data_warehouse/semantic/"
