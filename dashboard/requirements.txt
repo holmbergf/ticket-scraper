@@ -1,6 +1,6 @@
 streamlit>=1.37,<2
 duckdb>=1.4,<2
 pandas>=2.2,<3
-plotly>=5.24,<7
+plotly>=7.1.0,<8
 altair>=5,<6
 pyarrow>=17,<23
