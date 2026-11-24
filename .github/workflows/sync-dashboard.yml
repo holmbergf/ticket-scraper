@@ -1,0 +1,51 @@
+name: sync standalone dashboard
+
+# Re-export the Streamlit app + published warehouse snapshot to the
+# standalone dashboard repo (fholmberg/ticket-scraper-dashboard), which
+# Streamlit Community Cloud deploys. Runs after every successful ingest
+# and can be dispatched manually after a publish made outside Actions.
+# Push access is a write deploy key scoped to that one repository.
+on:
+  workflow_call:
+    secrets:
+      TICKET_SCRAPER_DASHBOARD_DEPLOY_KEY:
+        required: true
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-standalone-dashboard
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out ticket-scraper (source of truth)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check out standalone dashboard repo
+        uses: actions/checkout@v4
+        with:
+          repository: fholmberg/ticket-scraper-dashboard
+          ref: main
+          path: standalone-dashboard
+          ssh-key: ${{ secrets.TICKET_SCRAPER_DASHBOARD_DEPLOY_KEY }}
+      - name: Export and push if changed
+        run: |
+          ./dashboard/export_standalone.sh standalone-dashboard
+          cd standalone-dashboard
+          rm -rf __pycache__
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Standalone dashboard already up to date"
+          else
+            git commit -m "Refresh dashboard from ticket-scraper ${GITHUB_SHA::7}"
+            git push origin main
+          fi

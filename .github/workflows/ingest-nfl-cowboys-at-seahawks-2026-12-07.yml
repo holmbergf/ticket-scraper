@@ -18,6 +18,7 @@ permissions:
 jobs:
   ingest:
     uses: ./.github/workflows/ingest-collection.yml
+    secrets: inherit
     with:
       collection: nfl-cowboys-at-seahawks-2026-12-07
       source: ${{ inputs.source }}
