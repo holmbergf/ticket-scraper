@@ -19,7 +19,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8,<10", "ruff==0.14.10"]
+dev = ["pytest>=8,<10", "ruff==0.17.6"]
 
 [project.scripts]
 ticket-ingest = "ticket_ingest.cli:main"
