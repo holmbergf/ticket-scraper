@@ -28,7 +28,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Check out ticket-scraper (source of truth)
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # When chained after ingest, the ingest job has just pushed a
           # crawl commit; sync must export that new tip, not the SHA that
@@ -36,7 +36,7 @@ jobs:
           ref: main
           persist-credentials: false
       - name: Check out standalone dashboard repo
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: fholmberg/ticket-scraper-dashboard
           ref: main
