@@ -140,3 +140,8 @@ jobs:
           name: dbt-state
           path: dbt-transform/target/manifest.json
           if-no-files-found: error
+
+  sync-dashboard:
+    needs: ingest
+    uses: ./.github/workflows/sync-dashboard.yml
+    secrets: inherit
