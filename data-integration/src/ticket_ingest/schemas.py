@@ -94,6 +94,9 @@ def align(df: pd.DataFrame, dataset: str) -> pd.DataFrame:
     """
     schema = SCHEMAS[dataset]
     df = df.copy()
+    extras = sorted(set(df.columns) - {field.name for field in schema})
+    if extras:
+        raise ValueError(f"{dataset}: unexpected columns {extras}; frozen schema is the contract")
     for field in schema:
         if field.name not in df.columns:
             df[field.name] = None

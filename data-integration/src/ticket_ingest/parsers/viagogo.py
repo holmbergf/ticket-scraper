@@ -164,7 +164,7 @@ def parse_event_page(html: str, page_url: str, crawl_ts_utc: str) -> ParseResult
             _grid_price_cents(grid, "minPrice", "lowPrice")
             or json_ld_low
             or slider_low
-            or (min(l.listing_price_cents for l in listings) if listings else None)
+            or (min(item.listing_price_cents for item in listings) if listings else None)
         ),
         average_price_cents=_positive_price_cents(grid.get("averagePrice")),
         highest_price_cents=(
@@ -375,7 +375,7 @@ def _price_range_from_sliders(html: str) -> tuple[int | None, int | None]:
     values = [v for v in values if v]
     if not values:
         return None, None
-    return min(values), max(values) if len(values) > 1 else (min(values), None)
+    return min(values), max(values) if len(values) > 1 else None
 
 
 def _low_price_from_json_ld(html: str) -> int | None:

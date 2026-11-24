@@ -50,3 +50,5 @@ dashboard/.streamlit/secrets.toml
 # OS / editors
 .DS_Store
 Thumbs.db
+.muse/
+dbt-transform/.user.yml

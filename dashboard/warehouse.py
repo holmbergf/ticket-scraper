@@ -79,8 +79,23 @@ def _con() -> duckdb.DuckDBPyConnection:
     return duckdb.connect()
 
 
+def _fetchdf(sql: str, params: list | None = None) -> pd.DataFrame:
+    """Run one query on a short-lived connection (always closed)."""
+    with _con() as con:
+        return con.execute(sql, params or []).df()
+
+
+def _sql_path(path: Path) -> str:
+    """A Parquet path as a safely quoted SQL string literal."""
+    return "'" + str(path).replace("'", "''") + "'"
+
+
+def _parquet(table: str) -> str:
+    return f"read_parquet({_sql_path(_path(table))})"
+
+
 def load(table: str) -> pd.DataFrame:
-    return _con().execute(f"SELECT * FROM read_parquet('{_path(table)}')").df()
+    return _fetchdf(f"SELECT * FROM {_parquet(table)}")
 
 
 def _filter(values, col: str) -> tuple[str, list]:
@@ -155,9 +170,9 @@ def stages(collection: str | None = None) -> list[str]:
 def crawl_timestamps(collection: str | None = None) -> list[str]:
     cf, params = _filter(collection, "collection_slug")
     where = f"WHERE {cf}" if cf else ""
-    df = _con().execute(
-        f"SELECT DISTINCT crawl_ts_utc FROM read_parquet('{_path('price_trends')}') {where} ORDER BY 1",
-        params).df()
+    df = _fetchdf(
+        f"SELECT DISTINCT crawl_ts_utc FROM {_parquet('price_trends')} {where} ORDER BY 1",
+        params)
     return df["crawl_ts_utc"].astype(str).tolist()
 
 
@@ -178,10 +193,10 @@ def event_prices(collection: str | None = None, sources=None,
                    display_name, stage, team_1, team_2, participant_1, participant_2,
                    event_start_local, event_date, match_date, venue_name, city,
                    country, sources_tracking
-            FROM read_parquet('{_path('event_prices')}')
+            FROM {_parquet('event_prices')}
         ),
         priced AS (
-            SELECT * FROM read_parquet('{_path('source_prices')}') sp {where}
+            SELECT * FROM {_parquet('source_prices')} sp {where}
         ),
         agg AS (
             SELECT collection_slug, event_uid, MIN(lowest_price) AS best_price,
@@ -203,7 +218,7 @@ def event_prices(collection: str | None = None, sources=None,
         LEFT JOIN agg a USING (collection_slug, event_uid)
         LEFT JOIN best b USING (collection_slug, event_uid)
     """
-    df = _con().execute(sql, sparams + cparams).df()
+    df = _fetchdf(sql, sparams + cparams)
     if collection:
         df = df[df["collection_slug"] == collection]
     if sources:
@@ -253,18 +268,18 @@ def market_trends(collection: str | None = None, sources=None) -> pd.DataFrame:
     if cf:
         clauses.append(cf)
     where = "WHERE " + " AND ".join(clauses)
-    return _con().execute(f"""
+    return _fetchdf(f"""
         WITH daily_best AS (
             SELECT collection_slug, crawl_date, event_uid, MIN(lowest_price) AS best_price,
                    SUM(inventory_count) AS total_inventory
-            FROM read_parquet('{_path('price_trends')}') {where}
+            FROM {_parquet('price_trends')} {where}
             GROUP BY 1, 2, 3
         )
         SELECT crawl_date, MIN(best_price) AS min_price, MEDIAN(best_price) AS median_price,
                ROUND(AVG(best_price), 2) AS avg_price, MAX(best_price) AS max_price,
                COUNT(*) AS total_events, SUM(total_inventory) AS total_inventory
         FROM daily_best GROUP BY 1 ORDER BY 1
-    """, sparams + cparams).df()
+    """, sparams + cparams)
 
 
 def price_changes(collection: str | None = None, sources=None) -> pd.DataFrame:
@@ -277,11 +292,11 @@ def price_changes(collection: str | None = None, sources=None) -> pd.DataFrame:
     if cf:
         clauses.append(cf)
     where = "WHERE " + " AND ".join(clauses)
-    return _con().execute(f"""
+    return _fetchdf(f"""
         WITH daily_best AS (
             SELECT collection_slug, crawl_date, event_uid, event_key, match_key,
                    match_number, MIN(lowest_price) AS best_price
-            FROM read_parquet('{_path('price_trends')}') {where}
+            FROM {_parquet('price_trends')} {where}
             GROUP BY 1, 2, 3, 4, 5, 6
         ),
         bounds AS (SELECT collection_slug, event_uid, MIN(crawl_date) AS fd, MAX(crawl_date) AS ld
@@ -293,7 +308,7 @@ def price_changes(collection: str | None = None, sources=None) -> pd.DataFrame:
         FROM bounds b
         JOIN daily_best f ON f.collection_slug = b.collection_slug AND f.event_uid = b.event_uid AND f.crawl_date = b.fd
         JOIN daily_best l ON l.collection_slug = b.collection_slug AND l.event_uid = b.event_uid AND l.crawl_date = b.ld
-    """, sparams + cparams).df()
+    """, sparams + cparams)
 
 
 def price_trends(collection: str, source: str, event_id_external: str) -> pd.DataFrame:
@@ -313,11 +328,11 @@ def event_sparklines(collection: str | None = None, sources=None) -> pd.DataFram
     if cf:
         clauses.append(cf)
     where = "WHERE " + " AND ".join(clauses)
-    daily = _con().execute(f"""
+    daily = _fetchdf(f"""
         SELECT collection_slug, event_uid, crawl_date, MIN(lowest_price) AS best_price
-        FROM read_parquet('{_path('price_trends')}') {where}
+        FROM {_parquet('price_trends')} {where}
         GROUP BY 1, 2, 3 ORDER BY 1, 2, 3
-    """, sparams + cparams).df()
+    """, sparams + cparams)
     if daily.empty:
         return daily.assign(trend=pd.Series(dtype=object))
     return (daily.groupby(["collection_slug", "event_uid"])["best_price"]
@@ -330,12 +345,12 @@ def daily_best(event_uid: str, sources=None) -> pd.DataFrame:
     where = "WHERE lowest_price IS NOT NULL AND event_uid = ?"
     if sf:
         where += f" AND {sf}"
-    return _con().execute(f"""
+    return _fetchdf(f"""
         SELECT crawl_date, MIN(lowest_price) AS best_price,
                ARG_MIN(source, lowest_price) AS best_source, SUM(inventory_count) AS total_inventory
-        FROM read_parquet('{_path('price_trends')}') {where}
+        FROM {_parquet('price_trends')} {where}
         GROUP BY 1 ORDER BY 1
-    """, [event_uid] + params).df()
+    """, [event_uid] + params)
 
 
 def listing_distribution(collection: str, source: str, event_id_external: str) -> pd.DataFrame:

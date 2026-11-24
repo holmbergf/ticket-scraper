@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlparse
 
-from .config import REPO_ROOT, Settings
+from .config import Settings
 from .models import Event, ParseResult
 from .utils import clean_text, extract_event_id_from_url
 
@@ -337,7 +337,6 @@ class EventResolver:
             if self.assign_event(event, trusted_single=trusted_single):
                 kept_events.append(event)
                 key_by_external[(event.source, event.event_id_external)] = event.event_key
-        kept_ids = set(key_by_external)
         snapshots, listings = [], []
         for snap in result.snapshots:
             key = key_by_external.get((snap.source, snap.event_id_external))

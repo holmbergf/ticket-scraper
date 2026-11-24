@@ -18,7 +18,8 @@ permissions:
 jobs:
   ingest:
     uses: ./.github/workflows/ingest-collection.yml
-    secrets: inherit
+    secrets:
+      TICKET_SCRAPER_DASHBOARD_DEPLOY_KEY: ${{ secrets.TICKET_SCRAPER_DASHBOARD_DEPLOY_KEY }}
     with:
       collection: fifa-world-cup-2026
       source: ${{ inputs.source }}

@@ -326,6 +326,10 @@ def _crawl_source(source, storage, html_store, state, fetch_fn, options, known_i
 def _land(storage: LocalStorage, collection: CollectionConfig, source: str,
           result: ParseResult, crawl_ts_utc: str) -> None:
     """Land one source's crawl as content-addressed Parquet + manifests."""
+    for row in (*result.events, *result.snapshots, *result.listings):
+        if row.collection_slug != collection.slug or not row.event_key:
+            raise ValueError(
+                f"unresolved collection identity before landing: {row.collection_slug!r}/{row.event_key!r}")
     imported = utc_now_iso()
     label = f"{collection.slug}:{source}"
     write_dataset(storage, dedupe(events_frame(result.events, imported), EVENTS_NATURAL_KEY), "events", label)

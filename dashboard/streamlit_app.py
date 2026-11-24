@@ -14,6 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import altair as alt
+import html
 import pandas as pd
 import streamlit as st
 
@@ -140,6 +141,31 @@ def short_title(name: str, limit: int = 42) -> str:
     return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
 
 
+def _esc(value) -> str:
+    """Escape scraped text before it enters any unsafe_allow_html block."""
+    return html.escape(str(value), quote=True)
+
+
+def _date_label(value) -> str:
+    dt = pd.to_datetime(value)
+    return f"{dt:%b} {dt.day}, {dt.year}"
+
+
+def _day_label(value) -> str:
+    dt = pd.to_datetime(value)
+    return f"{dt:%b} {dt.day}"
+
+
+def _kickoff_label(value) -> str:
+    dt = pd.to_datetime(value)
+    return f"{dt:%a}, {_day_label(dt)} · {dt.strftime('%I:%M %p').lstrip('0')}"
+
+
+def _timestamp_label(value) -> str:
+    dt = pd.to_datetime(value)
+    return f"{_date_label(dt)}, {dt.strftime('%I:%M %p').lstrip('0')}"
+
+
 @st.cache_data(ttl=3600, show_spinner="Loading warehouse data…")
 def _event_prices(collection, sources_tuple, stage, city, participant, version: str):
     return wh.event_prices(collection, list(sources_tuple), stage, city, participant)
@@ -211,8 +237,8 @@ def participant_name(row, which: int) -> str | None:
 def team_block(name: str, sub: str, align: str = "left") -> None:
     st.markdown(
         f'<div style="text-align:{align}"><div class="team-name">'
-        f'<span style="color:{color(name)}">●</span> {name}</div>'
-        f'<div class="team-sub">{sub}</div></div>',
+        f'<span style="color:{color(name)}">●</span> {_esc(name)}</div>'
+        f'<div class="team-sub">{_esc(sub)}</div></div>',
         unsafe_allow_html=True,
     )
 
@@ -233,7 +259,7 @@ def inventory_bar(sp: pd.DataFrame) -> None:
             f'<div style="width:{share}%;background:{SOURCE_COLORS.get(r["source"], "#6b7280")}"></div>')
         labels.append(
             f'<span><span style="color:{SOURCE_COLORS.get(r["source"], "#6b7280")}">●</span> '
-            f'{SOURCE_DISPLAY_NAMES.get(r["source"], r["source"])} {share_text}</span>')
+            f'{_esc(SOURCE_DISPLAY_NAMES.get(r["source"], r["source"]))} {share_text}</span>')
     st.markdown(
         f'<div class="duel">{"".join(segments)}</div>'
         f'<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px 14px" class="small">'
@@ -257,7 +283,7 @@ def source_price_rows(sp: pd.DataFrame) -> None:
         c = SOURCE_COLORS.get(r["source"], "#6b7280")
         rows.append(
             f'<div class="src-row"><div class="src-name"><span style="color:{c}">●</span> '
-            f'{SOURCE_DISPLAY_NAMES.get(r["source"], r["source"])}</div>'
+            f'{_esc(SOURCE_DISPLAY_NAMES.get(r["source"], r["source"]))}</div>'
             f'<div class="bar-track"><div class="bar-fill" style="width:{w}%;background:{c}"></div></div>'
             f'<div class="bar-val">{usd(r["lowest_price"])}</div>'
             f'<div class="src-delta">{delta}</div></div>')
@@ -281,7 +307,7 @@ def compare_row(label: str, left_val, right_val, left_color: str, right_color: s
 
     st.markdown(
         f'<div class="cmp-row"><div>{side(left_val, lc, True)}</div>'
-        f'<div class="cmp-label">{label}</div><div>{side(right_val, rc, False)}</div></div>',
+        f'<div class="cmp-label">{_esc(label)}</div><div>{side(right_val, rc, False)}</div></div>',
         unsafe_allow_html=True,
     )
 
@@ -304,7 +330,7 @@ def price_context_panel(m, sp: pd.DataFrame, changes: pd.DataFrame,
             stage_med = priced[priced["stage"] == m.stage]["best_price"].median()
             if pd.notna(stage_med) and stage_med:
                 rel = (float(m.best_price) - float(stage_med)) / float(stage_med) * 100
-                lines.append(f"- **Vs {chart_stage(m.stage)} median** ({usd(stage_med)}) — "
+                lines.append(f"- **Vs {_esc(chart_stage(m.stage))} median** ({usd(stage_med)}) — "
                              f"this event is {cdelta(rel)}.")
     daily = wh.daily_best(str(m.event_uid), sources)
     if len(daily):
@@ -315,8 +341,8 @@ def price_context_panel(m, sp: pd.DataFrame, changes: pd.DataFrame,
         inv = daily.dropna(subset=["total_inventory"])
         if len(inv) > 1:
             lines.append(f"- **Inventory (all sources)** — {int(inv.iloc[0].total_inventory):,} "
-                         f"on {inv.iloc[0].crawl_date:%b %-d} → {int(inv.iloc[-1].total_inventory):,} "
-                         f"on {inv.iloc[-1].crawl_date:%b %-d}.")
+                         f"on {_day_label(inv.iloc[0].crawl_date)} → {int(inv.iloc[-1].total_inventory):,} "
+                         f"on {_day_label(inv.iloc[-1].crawl_date)}.")
     lines.append("")
     lines.append('<span class="small">Percentages are colored for buyers: green = cheaper. '
                  "Daily best uses canonical event-page snapshots only; small crawl counts "
@@ -328,7 +354,7 @@ def render_event_card(m, sp_all: pd.DataFrame, changes: pd.DataFrame,
                       priced: pd.DataFrame, sources: list[str]) -> None:
     sp = sp_all[sp_all["event_uid"] == m.event_uid]
     kickoff = pd.to_datetime(m.event_start_local) if pd.notna(m.event_start_local) else None
-    date_text = f"{kickoff:%a, %b %-d · %-I:%M %p}" if kickoff is not None else "Date TBD"
+    date_text = _kickoff_label(kickoff) if kickoff is not None else "Date TBD"
     p1, p2 = participant_name(m, 1), participant_name(m, 2)
     with st.container(border=True):
         if p1 and p2:
@@ -340,14 +366,14 @@ def render_event_card(m, sp_all: pd.DataFrame, changes: pd.DataFrame,
                 pill_cls = "pill" if chart_stage(m.stage) in ("Final", "Semi-Final", "Final Round") else "pill pill-amber"
                 st.markdown(
                     f'<div style="text-align:center;margin-top:0.45rem">'
-                    f'<span class="{pill_cls}">{m.stage or "Stage TBD"}</span></div>',
+                    f'<span class="{pill_cls}">{_esc(m.stage or "Stage TBD")}</span></div>',
                     unsafe_allow_html=True)
             with h:
                 team_block(p2, f"{m.venue_name or '—'} · {m.city or '—'}", align="right")
         else:
             st.markdown(
-                f'<div class="team-name">{m.display_name}</div>'
-                f'<div class="team-sub">{date_text} · {m.venue_name or "—"}</div>',
+                f'<div class="team-name">{_esc(m.display_name)}</div>'
+                f'<div class="team-sub">{_esc(date_text)} · {_esc(m.venue_name or "—")}</div>',
                 unsafe_allow_html=True)
         collection_title = COLLECTION_TITLES.get(m.collection_slug, m.collection_slug)
         seq = f" · Event {int(m.match_number)}" if pd.notna(m.get("match_number")) else ""
@@ -490,7 +516,7 @@ def render_event_listings(ctx: dict, m, *, key_suffix: str) -> None:
     latest_crawl = pd.to_datetime(listings["crawl_ts_utc"].max())
     st.markdown(
         f"**Showing {len(listings):,} listings for {picked} on {source_name}** · "
-        f"latest crawl {latest_crawl:%b %-d, %Y, %-I:%M %p} UTC · "
+        f"latest crawl {_timestamp_label(latest_crawl)} UTC · "
         f"cheapest {usd(listings['price'].min())}.")
     col_l, col_r = st.columns([3, 2])
     with col_l:
@@ -605,7 +631,7 @@ def page_market() -> None:
     cheapest = priced.loc[priced["best_price"].idxmin()]
     median_now = priced["best_price"].median()
     median_first = trends.iloc[0]["median_price"] if len(trends) else None
-    delta = (f"{(median_now - median_first) / median_first * 100:+.1f}% since {trends.iloc[0]['crawl_date']:%b %-d}"
+    delta = (f"{(median_now - median_first) / median_first * 100:+.1f}% since {_day_label(trends.iloc[0]['crawl_date'])}"
              if median_first else None)
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Cheapest event", usd(cheapest["best_price"]))
@@ -883,8 +909,8 @@ _collection_icon = str(_collection_row.iloc[0].icon or "") if len(_collection_ro
 _collection_title = COLLECTION_TITLES.get(SELECTED_COLLECTION, SELECTED_COLLECTION)
 st.title(f"{_collection_icon} {_collection_title}".strip())
 _selected_trends = _market_trends(SELECTED_COLLECTION, tuple(wh.sources(SELECTED_COLLECTION)), VERSION)
-_first = f"{pd.to_datetime(_selected_trends.iloc[0]['crawl_date']):%b %-d, %Y}" if len(_selected_trends) else "—"
-_last = f"{pd.to_datetime(_selected_trends.iloc[-1]['crawl_date']):%b %-d, %Y}" if len(_selected_trends) else "—"
+_first = _date_label(_selected_trends.iloc[0]["crawl_date"]) if len(_selected_trends) else "—"
+_last = _date_label(_selected_trends.iloc[-1]["crawl_date"]) if len(_selected_trends) else "—"
 st.caption(
     f"Data: resale marketplaces via the ticket-scraper semantic layer, crawled "
     f"{_first} → {_last} ({len(_selected_trends)} crawl days). Resale prices for "

@@ -56,6 +56,7 @@ class SnapshotDiff:
     previous_average_price_cents: int | None = None
     current_inventory_count: int | None = None
     previous_inventory_count: int | None = None
+    event_key: str | None = None
 
     @property
     def lowest_price_change_cents(self) -> int | None:

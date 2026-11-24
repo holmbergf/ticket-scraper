@@ -26,6 +26,8 @@ def get_snapshot_diffs(data_dir: Path, source: str, crawl_ts_utc: str, *,
     import duckdb
 
     snapshots_glob = str(Path(data_dir) / "raw" / "market_snapshots" / "**" / "*.parquet")
+    if not list((Path(data_dir) / "raw" / "market_snapshots").glob("**/*.parquet")):
+        return []  # first crawl ever: nothing to diff against
     events_glob = str(Path(data_dir) / "raw" / "events" / "**" / "*.parquet")
     con = duckdb.connect()
     try:
@@ -35,7 +37,7 @@ def get_snapshot_diffs(data_dir: Path, source: str, crawl_ts_utc: str, *,
                 SELECT * FROM (
                     SELECT * FROM read_parquet(?, hive_partitioning=true, union_by_name=true)
                     UNION ALL BY NAME
-                    SELECT NULL::VARCHAR AS collection_slug WHERE FALSE
+                    SELECT NULL::VARCHAR AS collection_slug, NULL::VARCHAR AS event_key WHERE FALSE
                 )
                 WHERE source = ?
                   AND coalesce(collection_slug, 'fifa-world-cup-2026') = ?
@@ -59,12 +61,12 @@ def get_snapshot_diffs(data_dir: Path, source: str, crawl_ts_utc: str, *,
                 FROM (
                     SELECT * FROM read_parquet(?, hive_partitioning=true, union_by_name=true)
                     UNION ALL BY NAME
-                    SELECT NULL::VARCHAR AS collection_slug WHERE FALSE
+                    SELECT NULL::VARCHAR AS collection_slug, NULL::VARCHAR AS event_key WHERE FALSE
                 )
                 WHERE source = ?
                   AND coalesce(collection_slug, 'fifa-world-cup-2026') = ? GROUP BY 1
             )
-            SELECT c.source, c.event_id_external, e.event_name, c.event_url, c.crawl_ts_utc,
+            SELECT c.source, c.event_id_external, c.event_key, e.event_name, c.event_url, c.crawl_ts_utc,
                    p.crawl_ts_utc, c.lowest_price_cents, p.lowest_price_cents,
                    c.average_price_cents, p.average_price_cents,
                    c.inventory_count, p.inventory_count
@@ -76,20 +78,20 @@ def get_snapshot_diffs(data_dir: Path, source: str, crawl_ts_utc: str, *,
             [snapshots_glob, source, collection_slug, crawl_ts_utc, crawl_ts_utc,
              events_glob, source, collection_slug],
         ).fetchall()
-    except Exception as exc:  # no raw data yet (first crawl)
-        log.warning("snapshot diffs unavailable for %s: %s", source, exc)
-        return []
+    except Exception:
+        log.exception("snapshot diff query failed for %s/%s", collection_slug, source)
+        raise
     finally:
         con.close()
 
     diffs: list[SnapshotDiff] = []
     for r in rows:
         diff = SnapshotDiff(
-            source=r[0], event_id_external=r[1], event_name=r[2], event_url=r[3],
-            crawl_ts_utc=r[4], previous_crawl_ts_utc=r[5],
-            current_lowest_price_cents=r[6], previous_lowest_price_cents=r[7],
-            current_average_price_cents=r[8], previous_average_price_cents=r[9],
-            current_inventory_count=r[10], previous_inventory_count=r[11],
+            source=r[0], event_id_external=r[1], event_key=r[2], event_name=r[3], event_url=r[4],
+            crawl_ts_utc=r[5], previous_crawl_ts_utc=r[6],
+            current_lowest_price_cents=r[7], previous_lowest_price_cents=r[8],
+            current_average_price_cents=r[9], previous_average_price_cents=r[10],
+            current_inventory_count=r[11], previous_inventory_count=r[12],
         )
         if changed_only and not diff.has_changes:
             continue
@@ -123,7 +125,7 @@ def evaluate_alerts(source_diffs: list[tuple[str, list[SnapshotDiff]]]) -> list[
     for source, diffs in source_diffs:
         for diff in diffs:
             if diff.current_lowest_price_cents:
-                lowest_by_event.setdefault(diff.event_id_external, []).append((source, diff.current_lowest_price_cents))
+                lowest_by_event.setdefault(diff.event_key or diff.event_id_external, []).append((source, diff.current_lowest_price_cents))
 
     gap_threshold = ALERT_THRESHOLDS["cross_market_gap"]
     for event_id, prices in lowest_by_event.items():

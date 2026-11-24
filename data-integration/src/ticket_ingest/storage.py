@@ -22,6 +22,8 @@ import hashlib
 import io
 import json
 import logging
+import os
+import tempfile
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -63,7 +65,20 @@ class LocalStorage:
     def put_bytes(self, key: str, data: bytes) -> None:
         p = self._path(key)
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_bytes(data)
+        # Write beside the destination, then replace atomically. A crash
+        # can leave a temp file, never a truncated file at the final
+        # content-addressed key (which exists() would skip forever).
+        fd, tmp_name = tempfile.mkstemp(dir=p.parent, prefix=f".{p.name}.", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "wb") as fh:
+                fh.write(data)
+            os.replace(tmp_name, p)
+        except BaseException:
+            try:
+                os.unlink(tmp_name)
+            except OSError:
+                pass
+            raise
 
     def get_bytes(self, key: str) -> bytes:
         return self._path(key).read_bytes()

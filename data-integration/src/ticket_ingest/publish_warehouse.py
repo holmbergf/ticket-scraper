@@ -13,7 +13,9 @@ a few megabytes. Run after `dbt build`:
 from __future__ import annotations
 
 import logging
+import os
 import sys
+import tempfile
 from pathlib import Path
 
 import pandas as pd
@@ -173,6 +175,20 @@ def build_catalog_frames(
     return pd.DataFrame(collection_rows), events
 
 
+def _write_parquet_atomic(table: pa.Table, dest: Path) -> None:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(dir=dest.parent, prefix=f".{dest.name}.", suffix=".tmp")
+    os.close(fd)
+    try:
+        pq.write_table(table, tmp_name, compression="zstd")
+        os.replace(tmp_name, dest)
+    except BaseException:
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
+
 def publish(db_path: Path, warehouse_dir: Path | None = None,
             settings: Settings | None = None) -> dict[str, int]:
     import duckdb
@@ -201,7 +217,7 @@ def publish(db_path: Path, warehouse_dir: Path | None = None,
             ]))
             dest = out_root / layer / f"{table}.parquet"
             dest.parent.mkdir(parents=True, exist_ok=True)
-            pq.write_table(arrow, dest, compression="zstd")
+            _write_parquet_atomic(arrow, dest)
             counts[table] = arrow.num_rows
             log.info("published %s/%s: %d rows", layer, table, arrow.num_rows)
 
@@ -226,7 +242,7 @@ def publish(db_path: Path, warehouse_dir: Path | None = None,
                 pa.field(f.name, pa.string() if pa.types.is_null(f.type) else f.type)
                 for f in table.schema
             ]))
-            pq.write_table(table, dest, compression="zstd")
+            _write_parquet_atomic(table, dest)
             counts[name] = len(frame)
             log.info("published semantic/%s: %d rows", name, len(frame))
 
