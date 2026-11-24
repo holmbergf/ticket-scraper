@@ -9,8 +9,10 @@ from ticket_ingest.shape import check_html_shape
 from ticket_ingest.parsers.gametime import discover_events as discover_gametime_events
 from ticket_ingest.parsers.gametime import parse_event_page as parse_gametime_event_page
 from ticket_ingest.parsers.stubhub import discover_events as discover_stubhub_events
+from ticket_ingest.parsers.stubhub import _price_range_from_sliders as stubhub_price_range
 from ticket_ingest.parsers.stubhub import parse_event_page as parse_stubhub_event_page
 from ticket_ingest.parsers.viagogo import discover_events as discover_viagogo_events
+from ticket_ingest.parsers.viagogo import _price_range_from_sliders as viagogo_price_range
 from ticket_ingest.parsers.viagogo import parse_event_page as parse_viagogo_event_page
 from ticket_ingest.parsers.vivid import discover_events as discover_vivid_events
 from ticket_ingest.parsers.vivid import parse_event_page as parse_vivid_event_page
@@ -279,86 +281,63 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(event.listings[0].deal_label, "Best price")
         self.assertEqual(event.listings[0].notes, "Side view")
 
-    def test_stubhub_live_event_page(self) -> None:
+    def test_stubhub_synthetic_event_page(self) -> None:
         result = parse_stubhub_event_page(
-            read_fixture("stubhub_event_153033405.html"),
-            "https://www.stubhub.com/world-cup-ciudad-de-mexico-tickets-6-11-2026/event/153033405/",
+            _synthetic_event_html("stubhub"),
+            "https://www.stubhub.com/example-tickets-6-11-2026/event/100000001/",
             "2026-04-04T14:48:50Z",
         )
         self.assertEqual(result.events[0].event_name, "Mexico vs South Africa - Match 1 (Group A)")
         self.assertEqual(result.events[0].currency, "USD")
-        self.assertIsNotNone(result.snapshots[0].lowest_price_cents)
-        self.assertGreater(result.snapshots[0].lowest_price_cents, 0)
-        self.assertIsNotNone(result.snapshots[0].highest_price_cents)
+        self.assertEqual(result.snapshots[0].lowest_price_cents, 210600)
+        self.assertEqual(result.snapshots[0].highest_price_cents, 499000)
         self.assertGreaterEqual(len(result.listings), 5)
-        sections = {l.section for l in result.listings if l.section}
-        self.assertTrue(len(sections) > 0)
+        self.assertTrue({item.section for item in result.listings})
 
-    def test_stubhub_live_discovery(self) -> None:
+    def test_stubhub_synthetic_discovery(self) -> None:
         result = discover_stubhub_events(
-            read_fixture("stubhub_discovery.html"),
-            "https://www.stubhub.com/world-cup-tickets/grouping/45410",
+            _synthetic_discovery_html("stubhub"),
+            "https://www.stubhub.com/example-tickets/grouping/1",
             "2026-04-04T14:48:50Z",
         )
         self.assertGreaterEqual(len(result.events), 5)
 
-    def test_viagogo_live_event_page(self) -> None:
+    def test_viagogo_synthetic_event_page(self) -> None:
         result = parse_viagogo_event_page(
-            read_fixture("viagogo_event_153033405.html"),
-            "https://www.viagogo.com/Sports-Tickets/Soccer/Soccer-Tournament/World-Cup-Tickets/E-153033405",
+            _synthetic_event_html("viagogo"),
+            "https://www.viagogo.com/example/E-100000001",
             "2026-04-04T14:48:50Z",
         )
         self.assertEqual(result.events[0].event_name, "Mexico vs South Africa - Match 1 (Group A)")
-        self.assertIsNotNone(result.snapshots[0].lowest_price_cents)
-        self.assertGreater(result.snapshots[0].lowest_price_cents, 0)
-        self.assertIsNotNone(result.snapshots[0].inventory_count)
-        self.assertGreater(result.snapshots[0].inventory_count, 100)
+        self.assertEqual(result.snapshots[0].lowest_price_cents, 210600)
+        self.assertEqual(result.snapshots[0].inventory_count, 298)
         self.assertGreaterEqual(len(result.listings), 5)
 
-    def test_viagogo_live_discovery(self) -> None:
+    def test_viagogo_synthetic_discovery(self) -> None:
         result = discover_viagogo_events(
-            read_fixture("viagogo_discovery.html"),
-            "https://www.viagogo.com/Sports-Tickets/Soccer/Soccer-Tournament/World-Cup-Tickets",
+            _synthetic_discovery_html("viagogo"),
+            "https://www.viagogo.com/example",
             "2026-04-04T14:48:50Z",
         )
         self.assertGreaterEqual(len(result.events), 5)
 
-    def test_vivid_live_event_page(self) -> None:
-        result = parse_vivid_event_page(
-            read_fixture("vivid_event_5080436.html"),
-            "https://www.vividseats.com/world-cup-soccer-tickets-bmo-field-6-12-2026--sports-soccer/production/5080436",
-            "2026-04-04T14:48:50Z",
-        )
-        self.assertIsNotNone(result.snapshots[0].lowest_price_cents)
-        self.assertGreater(result.snapshots[0].lowest_price_cents, 0)
-        self.assertGreaterEqual(len(result.listings), 3)
+    def test_single_slider_has_no_fabricated_high(self) -> None:
+        html = '<div aria-valuetext="$100"></div>'
+        self.assertEqual(stubhub_price_range(html), (10000, None))
+        self.assertEqual(viagogo_price_range(html), (10000, None))
 
-    def test_gametime_live_event_page(self) -> None:
-        result = parse_gametime_event_page(
-            read_fixture("gametime_event_66ac29dc.html"),
-            "https://gametime.co/soccer/fifa-world-cup-belgium-vs-egypt-match-16-group-e-tickets/6-15-2026-east-rutherford-nj-metlife-stadium/events/66ac29dc829dc33434fe4ee5",
-            "2026-04-04T14:48:50Z",
-        )
-        self.assertIsNotNone(result.snapshots[0].lowest_price_cents)
-        self.assertGreater(result.snapshots[0].lowest_price_cents, 0)
-        self.assertGreaterEqual(len(result.listings), 3)
-
-    def test_shape_check_live_fixtures_no_warnings(self) -> None:
-        fixture_dir = Path(__file__).parent / "fixtures"
+    def test_shape_check_synthetic_pages_no_warnings(self) -> None:
         cases = [
-            ("stubhub", "discovery", "stubhub_discovery.html"),
-            ("stubhub", "event", "stubhub_event_153033405.html"),
-            ("viagogo", "discovery", "viagogo_discovery.html"),
-            ("viagogo", "event", "viagogo_event_153033405.html"),
-            ("vivid", "event", "vivid_event_5080436.html"),
-            ("gametime", "event", "gametime_event_66ac29dc.html"),
+            ("stubhub", "discovery", _synthetic_discovery_html("stubhub")),
+            ("stubhub", "event", _synthetic_event_html("stubhub")),
+            ("viagogo", "discovery", _synthetic_discovery_html("viagogo")),
+            ("viagogo", "event", _synthetic_event_html("viagogo")),
+            ("vivid", "event", read_fixture("vivid_event.html")),
+            ("gametime", "event", read_fixture("gametime_event.html")),
         ]
-        cases = [(s, p, f) for s, p, f in cases if (fixture_dir / f).exists()]
-        for source, page_type, fixture in cases:
+        for source, page_type, html in cases:
             with self.subTest(source=source, page_type=page_type):
-                html = read_fixture(fixture)
-                warnings = check_html_shape(source, page_type, html)
-                self.assertEqual(warnings, [], f"Unexpected warnings for {source}/{page_type}: {warnings}")
+                self.assertEqual(check_html_shape(source, page_type, html), [])
 
     def test_shape_check_detects_missing_markers(self) -> None:
         warnings = check_html_shape("stubhub", "event", "<html><body>empty page</body></html>")
@@ -374,6 +353,55 @@ class ParserTests(unittest.TestCase):
         self.assertFalse(_looks_like_challenge_page("<html><title>Normal Page</title></html>"))
         long_page = "x" * 15000 + "captcha"
         self.assertFalse(_looks_like_challenge_page(long_page))
+
+
+def _synthetic_sports_node(index: int, source: str) -> dict[str, object]:
+    event_id = 100000000 + index
+    if source == "viagogo":
+        url = f"https://www.viagogo.com/example/E-{event_id}"
+    else:
+        url = f"https://www.stubhub.com/example-tickets/event/{event_id}/"
+    return {
+        "@type": "SportsEvent",
+        "name": f"Mexico vs South Africa - Group A (Match {index})" if index == 1
+                else f"Example Home {index} vs Example Away {index} (Match {index})",
+        "startDate": "2026-06-11T09:00:00-06:00",
+        "url": url,
+        "location": {
+            "@type": "Place", "name": "Example Stadium",
+            "address": {"addressLocality": "Example City", "addressRegion": "EX",
+                        "addressCountry": "US"},
+        },
+        "offers": {
+            "@type": "AggregateOffer", "url": url, "priceCurrency": "USD",
+            "lowPrice": 2106, "validFrom": "2026-04-04T14:48:50Z",
+            "inventoryLevel": {"name": "298"},
+        },
+    }
+
+
+def _synthetic_discovery_html(source: str) -> str:
+    nodes = [_synthetic_sports_node(i, source) for i in range(1, 6)]
+    links = "".join(f'<a href="{node["url"]}">event</a>' for node in nodes)
+    return _json_ld_html({"@context": "https://schema.org", "@graph": nodes}) + links
+
+
+def _synthetic_event_html(source: str) -> str:
+    node = _synthetic_sports_node(1, source)
+    items = [
+        {"section": f"S{i}", "row": str(i), "rawPrice": 2106 + i * 100,
+         "listingNotes": [{"formattedListingNoteContent": "Synthetic fixture"}]}
+        for i in range(1, 6)
+    ]
+    state = {
+        "eventUrl": node["url"], "availableTickets": 298,
+        "grid": {"buyerCurrencyCode": "USD", "minPrice": 2106,
+                 "averagePrice": 2605, "maxPrice": 4990, "items": items},
+    }
+    markers = ('<div data-listing-id="synthetic-1" data-price="2106" '
+               'aria-valuetext="$2,106"></div>'
+               '<div aria-valuetext="$4,990"></div>')
+    return _json_ld_html({"@context": "https://schema.org", **node}) + _application_json_html(state) + markers
 
 
 def _json_ld_html(payload: dict[str, object]) -> str:

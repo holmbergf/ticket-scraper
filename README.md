@@ -1,5 +1,11 @@
 # ticket-scraper
 
+**[Open the live dashboard](https://ticket-scraper-dashboard-acwhbjgnk3u4opik4qsm8z.streamlit.app/)**
+
+[![CI data-integration](https://github.com/holmbergf/ticket-scraper/actions/workflows/data-integration.yml/badge.svg)](https://github.com/holmbergf/ticket-scraper/actions/workflows/data-integration.yml) [![CI dbt](https://github.com/holmbergf/ticket-scraper/actions/workflows/dbt.yml/badge.svg)](https://github.com/holmbergf/ticket-scraper/actions/workflows/dbt.yml) [![CI dashboard](https://github.com/holmbergf/ticket-scraper/actions/workflows/dashboard.yml/badge.svg)](https://github.com/holmbergf/ticket-scraper/actions/workflows/dashboard.yml)
+
+![Ticket Scraper dashboard](docs/assets/dashboard.png)
+
 Generic ELT pipeline for resale ticket prices. A tracked tournament,
 single game, or multi-session event is a **collection** declared in
 [`collections/`](collections/); adding one TOML file (plus a thin
@@ -152,11 +158,18 @@ with the default `GITHUB_TOKEN`.
   derive `match-<n>` keys in dbt silver, so no raw rewrite was needed.
 - FIFA history covers 2026-04-04 → 2026-05-04 (154 crawls): 481 source
   events over 104 matches, 35,484 canonical market snapshots, 591,953
-  listings. The Cowboys collection adds live observations from its first
-  crawl (Gametime + Vivid priced; StubHub/Viagogo are WAF-gated and may
-  land event rows without snapshots from some networks).
+  listings. The Cowboys and Masters collections add live observations
+  from their first crawls in November 2026.
 - One canonical snapshot per (collection, source, event, crawl): where a
   crawl produces discovery-page and event-page rows under one timestamp,
   the event-page row is kept (latest insert wins).
 - Prices are integer cents until the semantic layer. Raw schemas are
   frozen contracts in `ticket_ingest/schemas.py`.
+
+## License and data
+
+Code is MIT-licensed (see [`LICENSE`](LICENSE)). Committed Parquet files
+are factual resale-price observations collected from public marketplace
+pages; see [`DATA.md`](DATA.md) for provenance, limitations, and reuse
+terms. This project is not affiliated with FIFA, the NFL, Augusta
+National, or any marketplace.

@@ -110,6 +110,9 @@ def _run_crawl_command(settings, storage, args) -> None:
     if args.alerts_json:
         Path(args.alerts_json).write_text(json.dumps(alerts, indent=2))
         print(f"Wrote {len(alerts)} alert(s) to {args.alerts_json}")
+    if all_stats and (all(s.error_message for s in all_stats)
+                       or sum(s.snapshots for s in all_stats) == 0):
+        raise SystemExit("crawl produced no usable snapshots (see source errors above)")
 
 
 def _print_summary(all_stats, wall_elapsed, data_dir) -> None:

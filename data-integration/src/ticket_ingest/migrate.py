@@ -51,7 +51,7 @@ def migrate_sqlite(db_path: Path, storage: LocalStorage,
                     f"match-{int(r['match_number'])}" if pd.notna(r["match_number"])
                     else f"{r['source']}-{r['event_id_external']}")
         except Exception:
-            pass
+            log.warning("could not build event key map from events table", exc_info=True)
         for dataset, natural_key in _TABLES.items():
             # ORDER BY id: a crawl can store discovery + event-page
             # snapshots under one crawl_ts, with the event-page row

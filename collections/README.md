@@ -1,7 +1,7 @@
 # Collections
 
 One TOML file per tracked collection. A collection is the unit that gets
-its own crawl runs, workflow, and dashboard section: a tournament
+its own crawl runs, workflow, and dashboard Tracking switcher: a tournament
 (`fifa-world-cup-2026.toml`, 104 matches), a single game
 (`nfl-cowboys-at-seahawks-2026-12-07.toml`), or a multi-session event
 (one canonical event per day/session).
@@ -30,7 +30,7 @@ its own crawl runs, workflow, and dashboard section: a tournament
    `ticket-ingest crawl --collection <slug>`.
 5. Rebuild + publish (`dbt build --target prod`,
    `python -m ticket_ingest.publish_warehouse`). The dashboard picks the
-   collection and its per-event pages up from the published catalog —
+   collection and its collection pages up from the published catalog —
    no dashboard code changes.
 6. To run it in GitHub Actions, copy an existing
    `.github/workflows/ingest-<slug>.yml` caller and change the

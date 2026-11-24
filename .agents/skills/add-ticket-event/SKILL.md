@@ -125,8 +125,7 @@ Then: `.venv/bin/ticket-ingest collections validate <slug>` and
 ## 4. Test-crawl, then land real data
 
 Activate the project env (`source .venv/bin/activate`); on this machine
-prefix live crawls with
-`SSL_CERT_FILE=$(.venv/bin/python -c "import certifi;print(certifi.where())")`.
+resolve ordinary CA-bundle configuration for the environment if TLS validation fails; never disable certificate verification.
 
 1. Scratch crawl, one source at a time:
    `ticket-ingest --data-dir /tmp/<slug>-data crawl --collection <slug> --source <source>`.
@@ -192,7 +191,7 @@ History render the selected one.
   dashboard repo separately, then push both. On this machine the
   keychain holds the wrong GitHub account for each repo, so push with
   `git -c credential.helper= -c credential.helper='!gh auth git-credential' push`
-  (and `GH_TOKEN=$(gh auth token --user fholmberg)` for the standalone).
+  (using the standalone repository owner's configured GitHub credentials).
 - Watch the pushed CI runs to green before reporting done.
 
 ## Report

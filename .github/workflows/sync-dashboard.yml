@@ -21,11 +21,14 @@ concurrency:
 
 jobs:
   sync:
+    # The production sync target is this project's standalone repo.
+    # Forks should remove/adjust this guard and their own deploy key.
+    if: github.repository == 'holmbergf/ticket-scraper'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Check out ticket-scraper (source of truth)
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           # When chained after ingest, the ingest job has just pushed a
           # crawl commit; sync must export that new tip, not the SHA that
@@ -33,7 +36,7 @@ jobs:
           ref: main
           persist-credentials: false
       - name: Check out standalone dashboard repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: fholmberg/ticket-scraper-dashboard
           ref: main
