@@ -1,0 +1,118 @@
+# A multi-session event collection: one canonical event per tournament
+# round (Thu-Sun) at Augusta National, Apr 8-11 2027. Practice rounds
+# (Mon-Wed) and multi-day badges/passes are deliberately excluded — see
+# the Masters example in collections/README.md. Direct event URLs are
+# declared per source, verified against live marketplace pages.
+# StubHub/Viagogo list the same competition days but sold out with no
+# priced snapshots at probe time, so they are not configured.
+slug = "masters-2027"
+title = "The Masters 2027"
+kind = "event"
+status = "active"
+description = "The Masters Tournament at Augusta National Golf Club, April 8-11, 2027."
+timezone = "America/New_York"
+icon = "⛳"
+accent_color = "#076324"
+
+[[events]]
+key = "thursday"
+name = "2027 Masters Golf Tournament - Thursday"
+stage = "Round 1"
+sequence = 1
+starts_at_local = "2027-04-08T07:00:00-04:00"
+venue_name = "Augusta National Golf Club"
+city = "Augusta"
+region = "GA"
+country = "United States"
+currency = "USD"
+match_terms = ["Masters", "Thursday"]
+source_event_ids = { gametime = "6a8dcb5b8840a72821ef90e7", vivid = "6956640" }
+
+[[events]]
+key = "friday"
+name = "2027 Masters Golf Tournament - Friday"
+stage = "Round 2"
+sequence = 2
+starts_at_local = "2027-04-09T07:00:00-04:00"
+venue_name = "Augusta National Golf Club"
+city = "Augusta"
+region = "GA"
+country = "United States"
+currency = "USD"
+match_terms = ["Masters", "Friday"]
+source_event_ids = { gametime = "69efeffa717fb30859a15101", vivid = "6956644" }
+
+[[events]]
+key = "saturday"
+name = "2027 Masters Golf Tournament - Saturday"
+stage = "Round 3"
+sequence = 3
+starts_at_local = "2027-04-10T07:00:00-04:00"
+venue_name = "Augusta National Golf Club"
+city = "Augusta"
+region = "GA"
+country = "United States"
+currency = "USD"
+match_terms = ["Masters", "Saturday"]
+source_event_ids = { gametime = "69efeffadc68ef394745b0c9", vivid = "6956648" }
+
+[[events]]
+key = "sunday"
+name = "2027 Masters Golf Tournament - Sunday"
+stage = "Final Round"
+sequence = 4
+starts_at_local = "2027-04-11T07:00:00-04:00"
+venue_name = "Augusta National Golf Club"
+city = "Augusta"
+region = "GA"
+country = "United States"
+currency = "USD"
+match_terms = ["Masters", "Sunday"]
+source_event_ids = { gametime = "69efeffa051b42038d080f94", vivid = "6956660" }
+
+[sources.gametime]
+mode = "event_urls"
+page_key = "masters-2027"
+# Listings render client-side; scroll so the listing cards load.
+fetch_mode = "playwright"
+event_scroll = true
+event_wait_selector = "[data-testid^='listing-card-']"
+expected_events = 4
+
+[[sources.gametime.event_urls]]
+event_key = "thursday"
+url = "https://gametime.co/golf/the-masters-vs-the-masters-tickets/4-8-2027-augusta-ga-augusta-national-golf-club/events/6a8dcb5b8840a72821ef90e7"
+
+[[sources.gametime.event_urls]]
+event_key = "friday"
+url = "https://gametime.co/golf/2027-masters-golf-tournament-friday-tickets/4-9-2027-augusta-ga-augusta-national-golf-club/events/69efeffa717fb30859a15101"
+
+[[sources.gametime.event_urls]]
+event_key = "saturday"
+url = "https://gametime.co/golf/2027-masters-golf-tournament-saturday-tickets/4-10-2027-augusta-ga-augusta-national-golf-club/events/69efeffadc68ef394745b0c9"
+
+[[sources.gametime.event_urls]]
+event_key = "sunday"
+url = "https://gametime.co/golf/2027-masters-golf-tournament-sunday-tickets/4-11-2027-augusta-ga-augusta-national-golf-club/events/69efeffa051b42038d080f94"
+
+[sources.vivid]
+mode = "event_urls"
+page_key = "masters-2027"
+fetch_mode = "browser"
+expected_events = 4
+
+[[sources.vivid.event_urls]]
+event_key = "thursday"
+url = "https://www.vividseats.com/masters-golf-tournament-tickets-augusta-national-golf-course-4-8-2027--sports-pga-golf/production/6956640"
+
+[[sources.vivid.event_urls]]
+event_key = "friday"
+url = "https://www.vividseats.com/masters-golf-tournament-tickets-augusta-national-golf-course-4-9-2027--sports-pga-golf/production/6956644"
+
+[[sources.vivid.event_urls]]
+event_key = "saturday"
+url = "https://www.vividseats.com/masters-golf-tournament-tickets-augusta-national-golf-course-4-10-2027--sports-pga-golf/production/6956648"
+
+[[sources.vivid.event_urls]]
+event_key = "sunday"
+url = "https://www.vividseats.com/masters-golf-tournament-tickets-augusta-national-golf-course-4-11-2027--sports-pga-golf/production/6956660"

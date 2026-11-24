@@ -1,0 +1,19 @@
+{
+  "run_id": "20261124T184746Z-e265113207ac47c0",
+  "dataset": "events",
+  "source": "masters-2027:vivid",
+  "written_at": "2026-11-24T18:47:46.818508+00:00",
+  "rows": 4,
+  "keys": [
+    "raw/events/source=vivid/part-cbfbcdb8b174f4e3.parquet"
+  ],
+  "skipped_keys": [],
+  "covered_crawl_ts": [],
+  "sources": [
+    "vivid"
+  ],
+  "collections": [
+    "masters-2027"
+  ],
+  "content_hash": "e265113207ac47c0"
+}

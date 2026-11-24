@@ -1,0 +1,21 @@
+{
+  "run_id": "20261124T184747Z-ab9d9ce3ed157a2b",
+  "dataset": "market_snapshots",
+  "source": "masters-2027:gametime",
+  "written_at": "2026-11-24T18:47:47.197736+00:00",
+  "rows": 4,
+  "keys": [
+    "raw/market_snapshots/crawl_date=2026-11-24/part-3325edf9be8be695.parquet"
+  ],
+  "skipped_keys": [],
+  "covered_crawl_ts": [
+    "2026-11-24T18:47:25Z"
+  ],
+  "sources": [
+    "gametime"
+  ],
+  "collections": [
+    "masters-2027"
+  ],
+  "content_hash": "ab9d9ce3ed157a2b"
+}

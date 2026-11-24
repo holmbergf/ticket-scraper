@@ -1,0 +1,21 @@
+{
+  "run_id": "20261124T184746Z-6e40cb3aa4140701",
+  "dataset": "listings",
+  "source": "masters-2027:vivid",
+  "written_at": "2026-11-24T18:47:46.888407+00:00",
+  "rows": 4,
+  "keys": [
+    "raw/listings/crawl_date=2026-11-24/part-d0cf4637dacf909c.parquet"
+  ],
+  "skipped_keys": [],
+  "covered_crawl_ts": [
+    "2026-11-24T18:47:25Z"
+  ],
+  "sources": [
+    "vivid"
+  ],
+  "collections": [
+    "masters-2027"
+  ],
+  "content_hash": "6e40cb3aa4140701"
+}

@@ -1,0 +1,21 @@
+{
+  "run_id": "20261124T184746Z-74577a8d1b0df3a6",
+  "dataset": "market_snapshots",
+  "source": "masters-2027:vivid",
+  "written_at": "2026-11-24T18:47:46.875151+00:00",
+  "rows": 4,
+  "keys": [
+    "raw/market_snapshots/crawl_date=2026-11-24/part-8a967b1d849d5df7.parquet"
+  ],
+  "skipped_keys": [],
+  "covered_crawl_ts": [
+    "2026-11-24T18:47:25Z"
+  ],
+  "sources": [
+    "vivid"
+  ],
+  "collections": [
+    "masters-2027"
+  ],
+  "content_hash": "74577a8d1b0df3a6"
+}

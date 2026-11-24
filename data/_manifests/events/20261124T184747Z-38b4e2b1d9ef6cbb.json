@@ -1,0 +1,19 @@
+{
+  "run_id": "20261124T184747Z-38b4e2b1d9ef6cbb",
+  "dataset": "events",
+  "source": "masters-2027:gametime",
+  "written_at": "2026-11-24T18:47:47.184365+00:00",
+  "rows": 4,
+  "keys": [
+    "raw/events/source=gametime/part-2b64cb68f611ffdf.parquet"
+  ],
+  "skipped_keys": [],
+  "covered_crawl_ts": [],
+  "sources": [
+    "gametime"
+  ],
+  "collections": [
+    "masters-2027"
+  ],
+  "content_hash": "38b4e2b1d9ef6cbb"
+}
