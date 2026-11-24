@@ -16,7 +16,8 @@ REPO = Path(__file__).resolve().parents[2]
 
 def test_repo_collections_load():
     slugs = [c.slug for c in list_collections()]
-    assert slugs == ["fifa-world-cup-2026", "nfl-cowboys-at-seahawks-2026-12-07"]
+    assert slugs == [
+        "fifa-world-cup-2026", "masters-2027", "nfl-cowboys-at-seahawks-2026-12-07"]
 
 
 def test_fifa_config_covers_all_adapters():
@@ -52,6 +53,28 @@ def test_resolver_assigns_canonical_event_and_stamps_rows():
     assert out.events[0].team_1 == "Dallas Cowboys"
     assert out.snapshots[0].collection_slug == c.slug
     assert out.listings[0].event_key == "dallas-cowboys-at-seattle-seahawks"
+
+
+def test_resolver_multi_session_event_without_participants():
+    # Masters-style sessions have no two sides: source ids resolve each
+    # day to its own canonical event, and undeclared sessions (practice
+    # rounds, multi-day passes) are dropped with their snapshots.
+    c = load_collection("masters-2027")
+    assert [e.key for e in c.events] == ["thursday", "friday", "saturday", "sunday"]
+    assert all(e.participant_1 is None for e in c.events)
+    resolver = EventResolver(c)
+    sunday = Event(source="vivid", event_id_external="6956660",
+                   event_url="https://example.test/sun", event_name="Masters - Sunday")
+    practice = Event(source="vivid", event_id_external="6956628",
+                     event_url="https://example.test/mon", event_name="Masters - Monday Practice")
+    snap = MarketSnapshot(source="vivid", event_id_external="6956660",
+                          crawl_ts_utc="2026-11-24T00:00:00Z", event_url="https://example.test/sun",
+                          lowest_price_cents=691300)
+    out = resolver.assign_result(ParseResult(events=[sunday, practice], snapshots=[snap]))
+    assert [e.event_key for e in out.events] == ["sunday"]
+    assert out.events[0].stage == "Final Round"
+    assert out.events[0].venue_name == "Augusta National Golf Club"
+    assert out.snapshots[0].event_key == "sunday"
 
 
 def test_derived_keys_for_undeclared_collections():

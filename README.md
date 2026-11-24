@@ -4,8 +4,9 @@ Generic ELT pipeline for resale ticket prices. A tracked tournament,
 single game, or multi-session event is a **collection** declared in
 [`collections/`](collections/); adding one TOML file (plus a thin
 workflow caller) stands up its crawl, warehouse rows, and dashboard
-pages without code changes. Two collections ship today: the FIFA World
-Cup 2026 (104 matches) and Cowboys at Seahawks, Dec 7 2026 (one game).
+pages without code changes. Three collections ship today: the FIFA
+World Cup 2026 (104 matches), Cowboys at Seahawks, Dec 7 2026 (one
+game), and the Masters 2027 (four tournament rounds).
 
 The pipeline lands partitioned Parquet **in this repository**, models it
 with dbt, and serves a Streamlit dashboard from the published semantic
@@ -81,6 +82,7 @@ ticket-scraper/
 |---|---|---|
 | `ingest/fifa-world-cup-2026` | Manual | Crawl that collection (optional single source) |
 | `ingest/nfl-cowboys-at-seahawks-2026-12-07` | Manual | Crawl that collection |
+| `ingest/masters-2027` | Manual | Crawl that collection |
 | `ingest (reusable)` | Called by the above / manual | crawl → `dbt build --target prod` → publish → commit `data/`; alert + failure issues |
 | `ci/data-integration` | `data-integration/**`, `collections/**` | pytest, byte-compile, CLI smoke |
 | `ci/dbt` | Changes under `dbt-transform/**` | Full dbt build + data tests on mock fixtures; slim selection vs prod manifest reported informationally |

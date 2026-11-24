@@ -1,0 +1,24 @@
+name: ingest/masters-2027
+
+# Manual caller for one collection. Copy this file per collection and
+# change the collection input (slug = collections/<slug>.toml).
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: "Single source to crawl (empty = all configured)"
+        type: choice
+        options: ["", gametime, vivid]
+        default: ""
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  ingest:
+    uses: ./.github/workflows/ingest-collection.yml
+    secrets: inherit
+    with:
+      collection: masters-2027
+      source: ${{ inputs.source }}

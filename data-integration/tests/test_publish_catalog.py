@@ -18,7 +18,7 @@ def test_catalog_includes_configured_event_without_warehouse_rows():
     assert row["display_name"] == "Dallas Cowboys at Seattle Seahawks"
     assert not row["has_warehouse_data"]
     assert set(collections_df["collection_slug"]) == {
-        "fifa-world-cup-2026", "nfl-cowboys-at-seahawks-2026-12-07"}
+        "fifa-world-cup-2026", "masters-2027", "nfl-cowboys-at-seahawks-2026-12-07"}
 
 
 def test_catalog_warehouse_rows_win_and_dates_are_iso_strings():
